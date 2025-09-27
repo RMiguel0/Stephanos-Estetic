@@ -5,4 +5,5 @@ urlpatterns = [
     path('', include('SE_donations.urls')),
     path('', include('SE_sales.urls')),
     path('', include('SE_contact.urls')),
+    path('', include('SE_payments.urls')),
 ]

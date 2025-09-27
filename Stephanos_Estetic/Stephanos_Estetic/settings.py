@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'SE_sales',
     'SE_services',
     'SE_contact',
+    'SE_payments',
     'rest_framework',
     'corsheaders',
 ]
