@@ -1,52 +1,27 @@
-import { useEffect, useState } from 'react'
-
-export default function ServicesPage() {
-  const [services, setServices] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    const ac = new AbortController()
-    ;(async () => {
-      try {
-        const res = await fetch('/api/services/', { signal: ac.signal })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
-        setServices(data || [])
-      } catch (err) {
-        if (err.name !== 'AbortError') setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    })()
-    return () => ac.abort()
-  }, [])
-
+export default function Services() {
+  const servicios = [
+    { name: "Limpieza facial", dur: "60 min", price: "$24.990" },
+    { name: "Peeling químico", dur: "45 min", price: "$34.990" },
+    { name: "Dermaplaning", dur: "45 min", price: "$29.990" },
+    { name: "Masoterapia descontracturante", dur: "50 min", price: "$22.990" },
+  ];
   return (
-    <section style={{ padding: 24 }}>
-      <h2>Servicios</h2>
-      {loading && <p>Cargando…</p>}
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-      {!loading && !error && (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>ID</th>
-              <th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Nombre</th>
-              <th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: 8 }}>Precio</th>
-            </tr>
-          </thead>
-          <tbody>
-            {services.map(s => (
-              <tr key={s.id}>
-                <td style={{ padding: 8 }}>{s.id}</td>
-                <td style={{ padding: 8 }}>{s.name}</td>
-                <td style={{ padding: 8 }}>${s.price?.toLocaleString?.('es-CL') ?? s.price}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+    <section className="site-container">
+      <h1 className="text-3xl font-bold">Servicios</h1>
+      <p className="text-gray-600 mt-2">Agenda tu tratamiento ideal.</p>
+
+      <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {servicios.map((s) => (
+          <div key={s.name} className="card p-6">
+            <h3 className="font-semibold">{s.name}</h3>
+            <p className="text-gray-600 text-sm mt-1">{s.dur}</p>
+            <div className="mt-4 flex items-center justify-between">
+              <span className="font-semibold">{s.price}</span>
+              <button className="btn-primary text-sm px-3 py-1.5">Reservar</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
-  )
+  );
 }
