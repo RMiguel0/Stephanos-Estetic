@@ -26,7 +26,9 @@ export default function Products() {
     if (selectedCategory === "all") {
       setFilteredProducts(products);
     } else {
-      setFilteredProducts(products.filter((p) => p.category === selectedCategory));
+      setFilteredProducts(
+        products.filter((p) => p.category === selectedCategory)
+      );
     }
   }, [selectedCategory, products]);
 
@@ -42,22 +44,83 @@ export default function Products() {
     setTimeout(() => setAddMsg(""), 1500);
   };
 
+  const mapBackendProduct = (p) => ({
+    id: p.sku, // usa el SKU como id visible
+    sku: p.sku,
+    name: p.name,
+    price: Number(p.price) || 0,
+    stock: typeof p.stock === "number" ? p.stock : 0,
+    // Si aún no tienes categoría/descr en el backend, usa algo por defecto
+    category: guessCategory(p.name), // helper abajo
+    description: "", // o alguna descripción si la tienes
+    featured: false,
+  });
+
+  function guessCategory(name = "") {
+    const n = name.toLowerCase();
+    if (n.includes("polera") || n.includes("camiseta")) return "clothing";
+    if (n.includes("hidrat") || n.includes("protector") || n.includes("crema"))
+      return "beauty";
+    if (n.includes("taza") || n.includes("carcasa")) return "personalization";
+    return "all";
+  }
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      // intenta tu backend (ajusta la URL si corresponde)
-      const data = await fetchJSON("/api/products/");
-      setProducts(data || []);
-      setFilteredProducts(data || []);
+      const data = await fetchJSON("/api/products/"); // si no usas proxy, ver nota de Vite abajo
+      const mapped = Array.isArray(data) ? data.map(mapBackendProduct) : [];
+      setProducts(mapped);
+      setFilteredProducts(mapped);
     } catch (err) {
       console.warn("GET /api/products fallback:", err?.message);
-      // fallback de demo para que la vista funcione
       const demo = [
-        { id: "p1", name: "Hidratante Facial", price: 12990, category: "beauty", description: "Hidratación intensa.", featured: true },
-        { id: "p2", name: "Protector Solar SPF50", price: 11990, category: "beauty", description: "Protección UVA/UVB." },
-        { id: "p3", name: "Polera Básica", price: 8990, category: "clothing", description: "100% algodón, varios colores." },
-        { id: "p4", name: "Taza Personalizable", price: 6990, category: "personalization", description: "Sube tu imagen y personaliza." },
-        { id: "p5", name: "Carcasa Personalizable", price: 10990, category: "personalization", description: "iPhone / Samsung." },
+        {
+          id: "ST-000001",
+          sku: "ST-000001",
+          name: "Hidratante Facial",
+          price: 12990,
+          stock: 4,
+          category: "beauty",
+          description: "Hidratación intensa.",
+          featured: true,
+        },
+        {
+          id: "ST-000002",
+          sku: "ST-000002",
+          name: "Protector Solar SPF50",
+          price: 11990,
+          stock: 0,
+          category: "beauty",
+          description: "Protección UVA/UVB.",
+        },
+        {
+          id: "ST-000003",
+          sku: "ST-000003",
+          name: "Polera Básica",
+          price: 8990,
+          stock: 8,
+          category: "clothing",
+          description: "100% algodón, varios colores.",
+        },
+        {
+          id: "ST-000004",
+          sku: "ST-000004",
+          name: "Taza Personalizable",
+          price: 6990,
+          stock: 12,
+          category: "personalization",
+          description: "Sube tu imagen y personaliza.",
+        },
+        {
+          id: "ST-000005",
+          sku: "ST-000005",
+          name: "Carcasa Personalizable",
+          price: 10990,
+          stock: 2,
+          category: "personalization",
+          description: "iPhone / Samsung.",
+        },
       ];
       setProducts(demo);
       setFilteredProducts(demo);
@@ -65,7 +128,6 @@ export default function Products() {
       setLoading(false);
     }
   };
-
   const getCategoryEmoji = (cat) => {
     switch (cat) {
       case "clothing":
@@ -110,7 +172,8 @@ export default function Products() {
             </span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Descubre nuestra selección curada de productos de belleza premium, ropa y artículos personalizados.
+            Descubre nuestra selección curada de productos de belleza premium,
+            ropa y artículos personalizados.
           </p>
         </div>
 
@@ -141,7 +204,9 @@ export default function Products() {
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16">
             <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">No se encontraron productos en esta categoría.</p>
+            <p className="text-gray-500 text-lg">
+              No se encontraron productos en esta categoría.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -160,14 +225,29 @@ export default function Products() {
                     </div>
                   )}
                 </div>
-
                 <div className="p-5">
                   <div className="inline-block px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-semibold mb-3 uppercase">
                     {product.category}
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">
-                    {product.name}
-                  </h3>
+
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-bold text-gray-900 line-clamp-1">
+                      {product.name}
+                    </h3>
+                    <span
+                      className={`ml-3 text-xs font-semibold px-2 py-1 rounded-full ${
+                        product.stock > 0
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-200 text-gray-600"
+                      }`}
+                      title="Stock disponible"
+                    >
+                      {product.stock > 0
+                        ? `Stock: ${product.stock}`
+                        : "Agotado"}
+                    </span>
+                  </div>
+
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
                     {product.description}
                   </p>
@@ -187,11 +267,19 @@ export default function Products() {
                     ) : (
                       <button
                         onClick={() => addItem(product, 1)}
-                        className="px-4 py-2 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg hover:scale-105 transition-all text-sm"
+                        disabled={product.stock <= 0}
+                        className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                          product.stock > 0
+                            ? "bg-gradient-to-r from-pink-500 to-pink-600 text-white hover:shadow-lg hover:scale-105"
+                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                        }`}
+                        title={
+                          product.stock > 0 ? "Añadir al carrito" : "Sin stock"
+                        }
                       >
-                        Añadir al carrito
+                        {product.stock > 0 ? "Añadir al carrito" : "Sin stock"}
                       </button>
-                    )} 
+                    )}
                   </div>
                 </div>
               </div>

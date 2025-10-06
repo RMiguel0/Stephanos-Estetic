@@ -1,7 +1,8 @@
+# SE_sales/urls.py
 from django.urls import path
-from .views import sales_list
+from .api import ProductListAPI, CheckoutAPI
 
-app_name = 'sales'
 urlpatterns = [
-    path('sales/', sales_list, name='sales-list'),
+    path("products/", ProductListAPI.as_view(), name="products_list"),
+    path("checkout/", CheckoutAPI.as_view(), name="checkout"),
 ]

@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'SE_payments',
     'rest_framework',
     'corsheaders',
+    'import_export'
 ]
 
 MIDDLEWARE = [
@@ -85,6 +86,11 @@ CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
 ROOT_URLCONF = 'Stephanos_Estetic.urls'
+
+LOGIN_URL = "/admin/login/"
+LOGIN_REDIRECT_URL = "/"   # opcional
+
+
 
 TEMPLATES = [
     {

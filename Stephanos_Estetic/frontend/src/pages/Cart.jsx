@@ -18,6 +18,53 @@ export default function Cart() {
     );
   }
 
+  async function handleCheckout() {
+    if (items.length === 0) return;
+
+    // Construye el payload como espera el backend: [{ sku, qty }]
+    // Si tu carrito no tiene `sku`, usamos `id` (porque arriba lo cargas como id=sku).
+    const payload = {
+      items: items.map((it) => ({
+        sku: it.sku || it.id, // <-- clave
+        qty: Math.max(1, Number(it.qty) || 1),
+      })),
+      // opcional:
+      // customer_name: "",
+      // customer_email: "",
+    };
+
+    try {
+      const res = await fetch("/api/checkout/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Idempotencia simple (evita doble click): no usa crypto.randomUUID
+          "Idempotency-Key": String(Date.now()),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // Mensajes de validación del backend (stock insuficiente, SKU inexistente, etc.)
+        const msg =
+          Array.isArray(data?.errors) && data.errors.length
+            ? data.errors.join("\n")
+            : data?.detail || `Error HTTP ${res.status}`;
+        alert(msg);
+        return;
+      }
+
+      alert(`Orden #${data.order_id} creada. Total: $${data.total_amount}`);
+      clearCart();
+      // (opcional) redirige a una página de éxito
+      // navigate(`/order-success?id=${data.order_id}`);
+    } catch (err) {
+      alert(err?.message || "Error de red");
+    }
+  }
+
   return (
     <section className="min-h-screen bg-gradient-to-b from-white to-pink-50 py-8">
       <div className="site-container grid lg:grid-cols-3 gap-8">
@@ -38,7 +85,11 @@ export default function Cart() {
               <div key={it.id} className="p-6 flex gap-4 items-center">
                 <div className="h-20 w-24 rounded-lg bg-pink-50 overflow-hidden flex items-center justify-center">
                   {it.image_url ? (
-                    <img src={it.image_url} alt={it.name} className="h-full w-full object-cover" />
+                    <img
+                      src={it.image_url}
+                      alt={it.name}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <span className="text-3xl">🛍️</span>
                   )}
@@ -62,7 +113,9 @@ export default function Cart() {
                       type="number"
                       min="1"
                       value={it.qty}
-                      onChange={(e) => updateQty(it.id, parseInt(e.target.value || "1", 10))}
+                      onChange={(e) =>
+                        updateQty(it.id, parseInt(e.target.value || "1", 10))
+                      }
                       className="w-14 text-center rounded-md border border-gray-300 py-1"
                     />
                     <button
@@ -83,8 +136,12 @@ export default function Cart() {
                 </div>
 
                 <div className="text-right">
-                  <div className="font-semibold text-gray-900">{formatPrice(it.price)}</div>
-                  <div className="text-sm text-gray-500">Subtotal: {formatPrice(it.price * it.qty)}</div>
+                  <div className="font-semibold text-gray-900">
+                    {formatPrice(it.price)}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Subtotal: {formatPrice(it.price * it.qty)}
+                  </div>
                 </div>
               </div>
             ))}
@@ -110,7 +167,10 @@ export default function Cart() {
             </div>
           </div>
 
-          <button className="mt-6 w-full px-6 py-3 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
+          <button
+            onClick={handleCheckout}
+            className="mt-6 w-full px-6 py-3 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+          >
             Ir a pagar
           </button>
 
@@ -126,11 +186,17 @@ export default function Cart() {
 function formatPrice(n) {
   if (typeof n !== "number") return n ?? "";
   try {
-    return new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(n);
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      maximumFractionDigits: 0,
+    }).format(n);
   } catch {
     return `$${n}`;
   }
 }
 function labelize(s) {
-  return String(s || "").replace(/[_-]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  return String(s || "")
+    .replace(/[_-]/g, " ")
+    .replace(/\b\w/g, (m) => m.toUpperCase());
 }
