@@ -29,7 +29,13 @@
 }
 
 
+/* src/index.css (deja tu @import y @theme como ya los tienes) */
+
 @layer components {
+  .site-container { @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8; }
+
+  .card { @apply rounded-xl border border-gray-100 hover:shadow-sm transition; }
+
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 font-medium
            bg-[var(--color-brand-500)] text-white shadow-sm
@@ -42,7 +48,13 @@
            hover:bg-[var(--color-brand-50)] transition;
   }
 
+  /* Fondo del hero a pantalla completa */
   .gradient-bg {
-    background: radial-gradient(circle at top left, var(--color-brand-100), white 70%);
+    background:
+      radial-gradient(1200px 600px at 50% 20%, var(--color-brand-100), transparent 70%),
+      radial-gradient(800px 400px at 10% 10%,  var(--color-brand-50),  transparent 60%),
+      radial-gradient(800px 400px at 90% 10%,  var(--color-brand-50),  transparent 60%),
+      #ffffff;
   }
 }
+
