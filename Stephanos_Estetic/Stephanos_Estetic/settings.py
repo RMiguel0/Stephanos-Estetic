@@ -84,6 +84,19 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+CORS_ALLOW_CREDENTIALS = True  # permite enviar cookies (csrftoken/session)
+
+# Cookies en desarrollo (usa True en producción con HTTPS)
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+# Importante: la cookie CSRF NO debe ser HttpOnly si la lees desde JS:
+CSRF_COOKIE_HTTPONLY = False  # (default ya es False; lo declaramos explícito)
+
+# Para evitar 301 raros con trailing slash en endpoints /api/…/
+APPEND_SLASH = True
+
 
 ROOT_URLCONF = 'Stephanos_Estetic.urls'
 
@@ -140,12 +153,13 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Santiago'
 
 USE_I18N = True
 

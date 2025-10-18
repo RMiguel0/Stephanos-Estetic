@@ -1,21 +1,6 @@
 import { useState, useEffect } from "react";
 import { Clock, DollarSign, Calendar, Check, X } from "lucide-react";
 
-/**
- * Expectativas de endpoints Django (ajusta a tus rutas reales):
- *  GET  /api/services/?active=true
- *      -> [{ id, type, name, description, duration_minutes, price, active }, ...]
- *
- *  GET  /api/service_schedules/?service_id=<id>&is_booked=false&date_from=<YYYY-MM-DD>
- *      -> [{ id, service_id, date:"YYYY-MM-DD", start_time:"HH:MM", is_booked:false }, ...]
- *
- *  POST /api/bookings/
- *      body: { schedule_id, customer_name, customer_email, customer_phone, notes }
- *      -> 201 { ... }
- *
- * Si no existen, el componente usa datos de ejemplo (fallback) para que la UI no se caiga.
- */
-
 export default function Services() {
   const [services, setServices] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -37,7 +22,7 @@ export default function Services() {
 
   useEffect(() => {
     if (selectedService) {
-      fetchSchedules(selectedService.id);
+      fetchSchedules(selectedService.id); // puede ser numérico o "svcX", el backend acepta ambos
     }
   }, [selectedService]);
 
@@ -50,11 +35,9 @@ export default function Services() {
   const fetchServices = async () => {
     setLoading(true);
     try {
-      // 1) intenta Django
       const data = await fetchJSON("/api/services/?active=true");
       setServices(data || []);
     } catch (err) {
-      // 2) fallback de ejemplo (UI sigue viva)
       console.warn("GET /api/services fallback:", err?.message);
       setServices([
         {
@@ -92,39 +75,80 @@ export default function Services() {
 
   const fetchSchedules = async (serviceId) => {
     try {
-      const today = new Date().toISOString().split("T")[0];
-      try {
-        const data = await fetchJSON(
-          `/api/service_schedules/?service_id=${encodeURIComponent(
-            serviceId
-          )}&is_booked=false&date_from=${today}`
-        );
-        setSchedules(data || []);
-      } catch (err) {
-        console.warn("GET /api/service_schedules fallback:", err?.message);
-        // Fallback: 3 slots por servicio, hoy y mañana
-        const mk = (id, dayOffset, time) => {
-          const d = new Date();
-          d.setDate(d.getDate() + dayOffset);
-          const iso = d.toISOString().split("T")[0];
-          return {
-            id: `${id}-${iso}-${time}`,
-            service_id: serviceId,
-            date: iso,
-            start_time: time,
-            is_booked: false,
-          };
+      // RANGO: hoy -> +14 días
+      const from = new Date();
+      const to = new Date(from);
+      to.setDate(to.getDate() + 14);
+
+      const dateFrom = from.toISOString().slice(0, 10);
+      const dateTo   = to.toISOString().slice(0, 10);
+
+      const url = `/api/service_schedules/?service_id=${encodeURIComponent(
+        serviceId
+      )}&is_booked=false&date_from=${dateFrom}&date_to=${dateTo}`;
+
+      const data = await fetchJSON(url);
+
+      // Soporta array plano o { items: [...] }
+      const raw = Array.isArray(data) ? data : (data?.items ?? []);
+
+      // Normaliza a { id, service_id, date, start_time, is_booked }
+      let normalized = raw.map((s) => {
+        const iso = s.starts_at ?? s.start;
+        const d = new Date(iso);
+        const date = d.toISOString().slice(0, 10);
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        return {
+          id: s.id,
+          service_id: s.service_id ?? serviceId,
+          date,
+          start_time: `${hh}:${mm}`,
+          is_booked: (s.is_booked ?? s.isBooked) === true,
         };
-        setSchedules([
-          mk("a", 0, "10:00"),
-          mk("b", 0, "12:00"),
-          mk("c", 1, "16:30"),
-        ]);
+      });
+
+      // Si sigue vacío (p.ej. porque estás probando una fecha específica),
+      // hacemos un segundo intento forzando 2025-10-20 (ajústalo si quieres).
+      if (normalized.length === 0) {
+        const forceDate = "2025-10-20"; // <-- pon aquí la fecha de tu slot de admin
+        const forceUrl = `/api/service_schedules/?service_id=${encodeURIComponent(
+          serviceId
+        )}&is_booked=false&date_from=${forceDate}`;
+
+        const data2 = await fetchJSON(forceUrl);
+        const raw2 = Array.isArray(data2) ? data2 : (data2?.items ?? []);
+        normalized = raw2.map((s) => {
+          const iso = s.starts_at ?? s.start;
+          const d = new Date(iso);
+          const date = d.toISOString().slice(0, 10);
+          const hh = String(d.getHours()).padStart(2, "0");
+          const mm = String(d.getMinutes()).padStart(2, "0");
+          return {
+            id: s.id,
+            service_id: s.service_id ?? serviceId,
+            date,
+            start_time: `${hh}:${mm}`,
+            is_booked: (s.is_booked ?? s.isBooked) === true,
+          };
+        });
       }
-    } catch (e) {
-      console.error("Error schedules:", e);
+
+      setSchedules(normalized);
+    } catch (err) {
+      console.error("Error schedules:", err);
+      setSchedules([]);
     }
   };
+
+
+  // util chico para CSRF desde cookie (Django)
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return null;
+  }
 
   const handleBooking = async (e) => {
     e.preventDefault();
@@ -132,53 +156,48 @@ export default function Services() {
     setError("");
 
     const booking = {
-      schedule_id: selectedSchedule.id,
+      // el backend entiende service_schedule_id o slot_id
+      service_schedule_id: selectedSchedule.id,
       customer_name: bookingForm.customer_name,
       customer_email: bookingForm.customer_email,
+      // opcional: si agregas este campo al modelo (ver punto 3)
       customer_phone: bookingForm.customer_phone,
       notes: bookingForm.notes,
     };
 
     try {
-      // 1) intenta crear booking en Django
+      await fetch("/api/csrf/", { credentials: "include" }); 
       const res = await fetch("/api/bookings/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken") || "",
+        },
         body: JSON.stringify(booking),
+        credentials: "include",
       });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      // 2) intenta marcar el slot como reservado
-      try {
-        await fetch(`/api/service_schedules/${encodeURIComponent(selectedSchedule.id)}/`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is_booked: true }),
-        });
-      } catch {
-        /* opcional; si no tienes endpoint PATCH, ignora */
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || `HTTP ${res.status}`);
       }
 
       setShowSuccess(true);
       setBookingForm({ customer_name: "", customer_email: "", customer_phone: "", notes: "" });
       setSelectedSchedule(null);
-      if (selectedService) fetchSchedules(selectedService.id);
+      if (selectedService) fetchSchedules(selectedService.id); // refresca la grilla
 
       setTimeout(() => {
         setShowSuccess(false);
         setSelectedService(null);
-      }, 3000);
+      }, 2500);
     } catch (err) {
-      // Fallback “optimista” para demo si no tienes backend aún
-      console.warn("POST /api/bookings fallback:", err?.message);
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        setSelectedService(null);
-      }, 1500);
+      console.error("booking error:", err);
+      setError(typeof err?.message === "string" ? err.message : "No se pudo crear la reserva.");
     }
   };
+
 
   const formatDate = (dateString) => {
     const date = new Date(dateString + "T00:00:00");
@@ -235,7 +254,7 @@ export default function Services() {
                 </div>
                 <div className="p-6">
                   <div className="inline-block px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-semibold mb-3 uppercase">
-                    {service.type}
+                    {service.type || "service"}
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{service.name}</h3>
                   <p className="text-gray-600 mb-4 line-clamp-2">{service.description}</p>
@@ -456,7 +475,8 @@ export default function Services() {
 }
 
 /* helpers */
-function groupByDate(list) {
+function groupByDate(list = []) {
+  if (!Array.isArray(list)) return [];
   const acc = {};
   for (const s of list) {
     if (!acc[s.date]) acc[s.date] = [];

@@ -1,7 +1,11 @@
 from django.urls import path
-from .views import services_list
+from .views import csrf_ok, services_list, service_schedules, create_booking
 
-app_name = 'services'
+app_name = "booking"
+
 urlpatterns = [
-    path('services/', services_list, name='services-list'),
+    path("csrf/", csrf_ok, name="csrf_ok"),
+    path("services/", services_list, name="services_list"),
+    path("service_schedules/", service_schedules, name="service_schedules"),
+    path("bookings/", create_booking, name="create_booking"),
 ]
