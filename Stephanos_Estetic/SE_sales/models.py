@@ -7,7 +7,7 @@ class Product(models.Model):
     name  = models.CharField(max_length=255)
     stock = models.IntegerField(default=0)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    activo = models.BooleanField(default=True)
+    activo = models.BooleanField(default=True, db_index=True)
 
     def __str__(self):
         # Lo que verás en admin/listas
