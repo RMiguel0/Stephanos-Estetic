@@ -2,7 +2,11 @@
 from django.contrib import admin
 from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
-from SE_sales.models import Product
+from .models import Product, Order, OrderItem  
+
+admin.site.register(Order)      
+admin.site.register(OrderItem)  
+
 
 class ProductResource(resources.ModelResource):
     sku   = fields.Field(attribute="sku", column_name="SKU")
