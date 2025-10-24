@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 
@@ -175,3 +176,10 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+FRONTEND_URL = "http://localhost:5173"
+
+WEBPAY_ENV = "TEST"
+WEBPAY_COMMERCE_CODE = "597055555532"
+WEBPAY_API_KEY = "579B532A7440BB0C9079DED94D31EA161EBE3DC3C464F51F8BAA1A4F8A9E5E3C"
+WEBPAY_RETURN_URL = "http://localhost:8000/api/payments/commit"

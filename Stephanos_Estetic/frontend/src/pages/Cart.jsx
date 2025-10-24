@@ -18,53 +18,59 @@ export default function Cart() {
     );
   }
 
+
+
   async function handleCheckout() {
     if (items.length === 0) return;
 
-    // Construye el payload como espera el backend: [{ sku, qty }]
-    // Si tu carrito no tiene `sku`, usamos `id` (porque arriba lo cargas como id=sku).
+    // Construye el payload que usa tu backend (por si más adelante lo amplías)
     const payload = {
       items: items.map((it) => ({
-        sku: it.sku || it.id, // <-- clave
+        sku: it.sku || it.id,
         qty: Math.max(1, Number(it.qty) || 1),
       })),
-      // opcional:
-      // customer_name: "",
-      // customer_email: "",
     };
 
     try {
-      const res = await fetch("/api/checkout/", {
+      // Calcula el total directamente desde tu carrito (si ya lo tienes en una variable total)
+      const totalAmount = Math.round(
+        items.reduce((acc, it) => acc + it.price * it.qty, 0)
+      ) + 3990; // <-- si sumas el envío fijo de $3.990
+
+      // 1️⃣ Llamada al backend para crear transacción Webpay
+      const res = await fetch("http://localhost:8000/api/payments/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // Idempotencia simple (evita doble click): no usa crypto.randomUUID
-          "Idempotency-Key": String(Date.now()),
-        },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: totalAmount }),
       });
 
-      const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
-        // Mensajes de validación del backend (stock insuficiente, SKU inexistente, etc.)
-        const msg =
-          Array.isArray(data?.errors) && data.errors.length
-            ? data.errors.join("\n")
-            : data?.detail || `Error HTTP ${res.status}`;
-        alert(msg);
+        const err = await res.json().catch(() => ({}));
+        alert(`Error HTTP ${res.status}: ${err.detail || res.statusText}`);
         return;
       }
 
-      alert(`Orden #${data.order_id} creada. Total: $${data.total_amount}`);
-      clearCart();
-      // (opcional) redirige a una página de éxito
-      // navigate(`/order-success?id=${data.order_id}`);
-    } catch (err) {
-      alert(err?.message || "Error de red");
-    }
-  }
+      // 2️⃣ Backend responde con url + token
+      const { url, token } = await res.json();
 
+      // 3️⃣ Crea formulario temporal para redirigir a Webpay
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = url;
+
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "token_ws";
+      input.value = token;
+
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+    } catch (err) {
+      console.error("Error al crear pago:", err);
+      alert(`Error de conexión: ${err.message}`);
+    }
+  };
   return (
     <section className="min-h-screen bg-gradient-to-b from-white to-pink-50 py-8">
       <div className="site-container grid lg:grid-cols-3 gap-8">

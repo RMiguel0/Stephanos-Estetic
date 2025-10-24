@@ -5,27 +5,37 @@ from django.contrib.contenttypes.models import ContentType
 
 class PaymentIntent(models.Model):
     class Status(models.TextChoices):
-        PENDING = "PENDING"
-        REQUIRES_ACTION = "REQUIRES_ACTION"
-        PAID = "PAID"
+        AUTHORIZED = "AUTHORIZED"
         FAILED = "FAILED"
-        REFUNDED = "REFUNDED"
+        ABORTED = "ABORTED"
+        REVERSED = "REVERSED"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    amount = models.BigIntegerField()             # CLP en pesos (sin decimales)
-    currency = models.CharField(max_length=10, default="CLP")
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    description = models.CharField(max_length=140)
+    buy_order = models.CharField(max_length=64, unique=True, db_index=True)
+    token = models.CharField(max_length=128, db_index=True)
+    session_id = models.CharField(max_length=64, blank=True, null=True)
 
-    # vínculo polimórfico al objeto de negocio (Order, Booking, Donation)
-    ref_content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
-    ref_object_id = models.PositiveIntegerField()
-    ref_object = GenericForeignKey('ref_content_type', 'ref_object_id')
+    amount = models.PositiveIntegerField()
+    status = models.CharField(max_length=16, choices=Status.choices)
 
-    provider = models.CharField(max_length=30)           # "webpay", "mercadopago", etc.
-    provider_session_id = models.CharField(max_length=120, blank=True)
-    return_url = models.URLField()
-    cancel_url = models.URLField()
-    metadata = models.JSONField(default=dict, blank=True)
+    vci = models.CharField(max_length=8, blank=True, null=True)
+    authorization_code = models.CharField(max_length=10, blank=True, null=True)
+    accounting_date = models.CharField(max_length=16, blank=True, null=True)
+    transaction_date = models.DateTimeField(blank=True, null=True)
+    payment_type_code = models.CharField(max_length=8, blank=True, null=True)
+    installments_number = models.PositiveIntegerField(default=0)
+    card_last4 = models.CharField(max_length=4, blank=True, null=True)
+
+    raw = models.JSONField(default=dict)  # respuesta completa de Transbank
+
+    # (Opcional) referencia a tu Order real:
+    # from SE_sales.models import Order
+    # order = models.ForeignKey("SE_sales.Order", null=True, blank=True,
+    #                           on_delete=models.SET_NULL, related_name="payments")
 
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.buy_order} {self.status} ${self.amount}"
+        
