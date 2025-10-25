@@ -1,5 +1,11 @@
 # SE_payments/views.py
 import uuid
+from io import BytesIO
+from django.http import FileResponse, Http404
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+from django.utils import timezone
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -18,6 +24,9 @@ from datetime import datetime
 
 
 FRONTEND_URL = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+
+def _clp(n: int) -> str:
+    return f"${n:,.0f}".replace(",", ".")
 
 def _to_dt(s: str | None):
     if not s:
@@ -161,9 +170,73 @@ def webpay_commit(request):
 
     # 5) decide: JSON (API) o redirección a tu frontend
     # Para SPA es cómodo redirigir a /checkout/success?order=... y ahí mostrar detalle
-    return redirect(f"{FRONTEND_URL}/checkout/success?order={buy_order}")
+    return redirect(f"{FRONTEND_URL}/checkout/success?ok={str(ok).lower()}&buy_order={buy_order}")
 
     # Si prefieres JSON (como ahora):
     # return Response({"ok": ok, "result": result})
 
     
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def payment_detail(request):
+    buy_order = request.GET.get("buy_order")
+    try:
+        p = PaymentIntent.objects.get(buy_order=buy_order)
+        return Response({
+            "buy_order": p.buy_order,
+            "amount": p.amount,
+            "status": p.status,
+            "authorization_code": p.authorization_code,
+            "transaction_date": p.transaction_date,
+            "card_last4": p.card_last4,
+        })
+    except PaymentIntent.DoesNotExist:
+        return Response({"detail": "Not found"}, status=404)
+    
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def payment_receipt(request):
+    buy_order = request.GET.get("buy_order")
+    if not buy_order:
+        return Response({"detail": "buy_order requerido"}, status=400)
+    try:
+        p = PaymentIntent.objects.get(buy_order=buy_order)
+    except PaymentIntent.DoesNotExist:
+        raise Http404("Pago no encontrado")
+
+    # PDF en memoria
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    W, H = A4
+    x, y = 25*mm, H - 30*mm
+
+    # Encabezado
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(x, y, "Boleta de pago (TEST)")
+    y -= 10*mm
+    c.setFont("Helvetica", 10)
+    c.drawString(x, y, f"Fecha: {timezone.localtime(p.transaction_date or timezone.now()):%Y-%m-%d %H:%M}")
+    y -= 6*mm
+    c.drawString(x, y, f"Orden: {p.buy_order}")
+    y -= 6*mm
+    c.drawString(x, y, f"Estado: {p.status}")
+    y -= 6*mm
+    if p.authorization_code:
+        c.drawString(x, y, f"Código de autorización: {p.authorization_code}")
+        y -= 6*mm
+    if p.card_last4:
+        c.drawString(x, y, f"Tarjeta: **** **** **** {p.card_last4}")
+        y -= 6*mm
+
+    # (Si luego relacionas Order y Items, aquí puedes listar ítems)
+    y -= 4*mm
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(x, y, f"Total pagado: {_clp(p.amount)}")
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+
+    filename = f"boleta_{p.buy_order}.pdf"
+    return FileResponse(buf, as_attachment=True, filename=filename, content_type="application/pdf")
