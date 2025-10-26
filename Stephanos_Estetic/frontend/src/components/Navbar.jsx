@@ -26,6 +26,7 @@ export default function Navbar() {
           <NavLink to="/products" className={({isActive}) => `${linkBase} ${isActive?linkActive:linkInactive}`}>Productos</NavLink>
           <NavLink to="/contact" className={({isActive}) => `${linkBase} ${isActive?linkActive:linkInactive}`}>Contacto</NavLink>
           <NavLink to="/cart" className={({isActive}) => `${linkBase} ${isActive?linkActive:linkInactive}`}>🛒</NavLink>
+          <NavLink to="/login" className={({isActive}) => `${linkBase} ${isActive?linkActive:linkInactive}`}>Iniciar sesión</NavLink>
         </div>
 
         {/* mobile */}

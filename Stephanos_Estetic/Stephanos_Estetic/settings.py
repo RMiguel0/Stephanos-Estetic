@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'SE_services',
     'SE_contact',
     'SE_payments',
+    'SE_users',
     'rest_framework',
     'corsheaders',
     'import_export'
@@ -113,6 +114,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -183,3 +185,7 @@ WEBPAY_ENV = "TEST"
 WEBPAY_COMMERCE_CODE = "597055555532"
 WEBPAY_API_KEY = "579B532A7440BB0C9079DED94D31EA161EBE3DC3C464F51F8BAA1A4F8A9E5E3C"
 WEBPAY_RETURN_URL = "http://localhost:8000/api/payments/commit"
+
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"

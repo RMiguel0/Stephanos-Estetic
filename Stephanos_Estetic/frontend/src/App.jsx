@@ -9,7 +9,9 @@ import Contact from "./pages/Contact.jsx";
 import Personalization from "./pages/Personalization.jsx";
 import Cart from "./pages/Cart.jsx";
 import CheckoutSuccess from "./pages/CheckoutSuccess.jsx";
-
+import Login from "./pages/Login.jsx";
+import UserProfile from "./pages/UserProfile.jsx";
+import Register from "./pages/Register.jsx";
 
 export default function App() {
   return (
@@ -22,6 +24,9 @@ export default function App() {
           <Route path="/products" element={<div className="site-container py-8"><Products /></div>} />
           <Route path="/contact" element={<div className="site-container py-8"><Contact /></div>} />
           <Route path="/personalization" element={<div className="site-container py-8"><Personalization /></div>} />
+          <Route path="/login" element={<div className="site-container py-8"><Login /></div>} />
+          <Route path="/register" element={<div className="site-container py-8"><Register /></div>} />
+          <Route path="/profile" element={<div className="site-container py-8"><UserProfile /></div>} />
           <Route path="/cart" element={<div className="site-container py-8"><Cart /></div>} />
           <Route path="/checkout/success" element={<CheckoutSuccess />} />
         </Routes>
