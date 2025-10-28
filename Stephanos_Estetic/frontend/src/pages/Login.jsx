@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Mail, Lock, AlertCircle } from "lucide-react";
-import { Link } from "react-router-dom";
-import { GoogleLogin } from "@react-oauth/google";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 // helper para leer la cookie csrftoken
 function getCookie(name) {
@@ -14,22 +12,9 @@ function getCookie(name) {
 
 export default function Login() {
   const navigate = useNavigate();
-  const [csrf, setCsrf] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ email: "", password: "" });
-
-  const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-  // 1) asegúrate de tener una vista en Django que setea la cookie CSRF, por ejemplo /accounts/csrf/
-  useEffect(() => {
-    (async () => {
-      try {
-        await fetch("/accounts/csrf/", { credentials: "include" });
-        setCsrf(getCookie("csrftoken") || "");
-      } catch (_) {}
-    })();
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,60 +22,33 @@ export default function Login() {
     setError("");
 
     try {
-      const res = await fetch("/accounts/login/", {
+      // login tradicional Django (si lo implementas)
+      const res = await fetch("http://localhost:8000/api/auth/login/", {
         method: "POST",
-        credentials: "include", // <-- recibe y manda cookies (sesión de Django)
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          "X-CSRFToken": csrf, // <-- CSRF de Django
+          "X-CSRFToken": getCookie("csrftoken") || "",
         },
-        body: JSON.stringify({
-          email: form.email,
-          password: form.password,
-        }),
+        body: JSON.stringify(form),
       });
 
       if (!res.ok) {
-        let msg = "Credenciales inválidas";
-        try {
-          const data = await res.json();
-          if (data?.detail) msg = data.detail;
-        } catch {}
-        setError(msg);
+        const data = await res.json().catch(() => ({}));
+        setError(data.detail || "Credenciales inválidas");
       } else {
-        // si Django devuelve 200 y setea la cookie de sesión, ya estás logueado
         navigate("/profile");
       }
     } catch (err) {
-      setError("No se pudo iniciar sesión. Intenta nuevamente.");
+      setError("Error de conexión con el servidor.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    try {
-      // Envía el JWT de Google a tu backend para validarlo y crear sesión en Django
-      const res = await fetch("/api/auth/google/", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
-        },
-        body: JSON.stringify({
-          credential: credentialResponse.credential,
-        }),
-      });
-
-      if (!res.ok) {
-        setError("No se pudo iniciar sesión con Google.");
-        return;
-      }
-      navigate("/profile");
-    } catch (err) {
-      setError("Error con Google Sign-In.");
-    }
+  const handleGoogleLogin = () => {
+    // Redirige directamente al flujo de allauth
+    window.location.href = "http://localhost:8000/accounts/google/login/";
   };
 
   return (
@@ -171,11 +129,19 @@ export default function Login() {
             </Link>
           </p>
 
+          {/* Google Login Button */}
           <div className="mt-6 flex justify-center">
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => setError("Error con Google")}
-            />
+            <button
+              onClick={handleGoogleLogin}
+              className="w-full py-3 border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-all"
+            >
+              <img
+                src="https://developers.google.com/identity/images/g-logo.png"
+                alt="Google"
+                className="w-5 h-5 mr-2"
+              />
+              Iniciar sesión con Google
+            </button>
           </div>
         </div>
       </div>

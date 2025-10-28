@@ -39,6 +39,13 @@ INSTALLED_APPS = [
     "corsheaders",
     "import_export",
 
+    # Auth sites/allauth
+    "django.contrib.sites",              # <- requerido por allauth
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+
     # Proyecto
     "SE_donations",
     "SE_sales",
@@ -53,41 +60,18 @@ INSTALLED_APPS = [
 # ──────────────────────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # CORS debe ir arriba de CommonMiddleware
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",   # ← AÑADIR AQUÍ
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "Stephanos_Estetic.urls"
 WSGI_APPLICATION = "Stephanos_Estetic.wsgi.application"
-
-# ──────────────────────────────────────────────────────────────────────────────
-# CORS / CSRF (SPA en Vite)
-# ──────────────────────────────────────────────────────────────────────────────
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-CORS_ALLOW_CREDENTIALS = True  # permite enviar cookies (csrftoken / session)
-
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
-# Cookies en desarrollo (ajusta para producción con HTTPS)
-SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-CSRF_COOKIE_HTTPONLY = False  # debe ser False si lees csrftoken desde JS
-
-# Mantén los slashes de Django
-APPEND_SLASH = True
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Templates
@@ -100,7 +84,7 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.debug",
-                "django.template.context_processors.request",
+                "django.template.context_processors.request",  # <- necesario para allauth
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
@@ -144,7 +128,33 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# REST Framework (ajusta permisos y throttles según tus endpoints)
+# CORS / CSRF (SPA Vite en 5173 y backend en 8000)
+# ──────────────────────────────────────────────────────────────────────────────
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOW_CREDENTIALS = True  # permite enviar cookies (csrftoken / session)
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+# Cookies en desarrollo (ajusta para producción con HTTPS)
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False  # False si lees csrftoken desde JS
+
+# Mantén los slashes de Django
+APPEND_SLASH = True
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DRF
 # ──────────────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
@@ -161,11 +171,38 @@ REST_FRAMEWORK = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Auth redirects
+# Auth / allauth
 # ──────────────────────────────────────────────────────────────────────────────
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/"
+# En dev redirigimos al frontend SPA
+LOGIN_REDIRECT_URL = os.getenv("LOGIN_REDIRECT_URL", "http://localhost:5173/profile")
+LOGOUT_REDIRECT_URL = os.getenv("LOGOUT_REDIRECT_URL", "http://localhost:5173")
+
+SITE_ID = 1
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+# allauth básicos en dev
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_LOGIN_METHOD = "username_email" 
+ACCOUNT_SIGNUP_FIELDS = ["username", "email", "password1", "password2"]
+SOCIALACCOUNT_LOGIN_ON_GET = True  # clic y va directo a Google
+ACCOUNT_LOGOUT_ON_GET = True    # clic y va directo al logout
+
+# Carga de credenciales de Google desde .env (evita usar admin si quieres todo en código)
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "APP": {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
+            "secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
+            "key": "",
+        },
+        "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": {"access_type": "offline"},
+    }
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Constantes del proyecto
@@ -177,7 +214,7 @@ WEBPAY_COMMERCE_CODE = os.getenv("WEBPAY_COMMERCE_CODE", "")
 WEBPAY_API_KEY = os.getenv("WEBPAY_API_KEY", "")
 WEBPAY_RETURN_URL = "http://localhost:8000/api/payments/commit"
 
-# Google OAuth (backend). Leemos cualquiera de los dos nombres por comodidad.
+# Google OAuth (alias por compatibilidad si en algún punto lees GOOGLE_OAUTH_CLIENT_ID)
 GOOGLE_CLIENT_ID = (
     os.getenv("GOOGLE_OAUTH_CLIENT_ID")
     or os.getenv("GOOGLE_CLIENT_ID")
