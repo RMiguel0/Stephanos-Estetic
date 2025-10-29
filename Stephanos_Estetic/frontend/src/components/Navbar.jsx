@@ -8,13 +8,23 @@ const API_BASE = "http://localhost:8000"; // backend Django
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [isAuthenticated, setAuthenticated] = useState(false);
+  const [userPic, setUserPic] = useState("");
 
   // Comprueba sesión al montar
   useEffect(() => {
     fetch(`${API_BASE}/api/user/me/`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
-        setAuthenticated(data?.is_authenticated ?? false);
+        const auth = data?.is_authenticated ?? false;
+        setAuthenticated(auth);
+
+        if (auth) {
+          fetch(`${API_BASE}/api/profile`, { credentials: "include" })
+            .then((res) => res.json())
+            .then((profileData) =>
+              setUserPic(profileData.profile_picture || "")
+            );
+        }
       })
       .catch(() => setAuthenticated(false));
   }, []);
@@ -24,8 +34,7 @@ export default function Navbar() {
     window.location.origin
   )}`;
 
-  const linkBase =
-    "px-3 py-2 rounded-md text-sm font-medium transition";
+  const linkBase = "px-3 py-2 rounded-md text-sm font-medium transition";
   const linkActive = "text-[var(--color-brand-600)] bg-[var(--color-brand-50)]";
   const linkInactive = "text-gray-700 hover:text-gray-900";
 
@@ -34,7 +43,9 @@ export default function Navbar() {
       <nav className="site-container h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img src={logo} alt="Stephanos Estetic" className="h-8 w-auto" />
-          <span className="font-semibold tracking-tight">Stephanos Estetic</span>
+          <span className="font-semibold tracking-tight">
+            Stephanos Estetic
+          </span>
         </Link>
 
         {/* desktop */}
@@ -85,23 +96,29 @@ export default function Navbar() {
               <NavLink
                 to="/profile"
                 className={({ isActive }) =>
-                  `${linkBase} ${isActive ? linkActive : linkInactive}`
+                  `${linkBase} ${
+                    isActive ? linkActive : linkInactive
+                  } flex items-center gap-2`
                 }
               >
-                Mi perfil
+                {userPic ? (
+                  <img
+                    src={userPic}
+                    alt="avatar"
+                    className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  "Mi perfil"
+                )}
               </NavLink>
-              <a
-                href={logoutUrl}
-                className={`${linkBase} ${linkInactive}`}
-              >
+
+              <a href={logoutUrl} className={`${linkBase} ${linkInactive}`}>
                 Cerrar sesión
               </a>
             </>
           ) : (
-            <a
-              href={loginUrl}
-              className={`${linkBase} ${linkInactive}`}
-            >
+            <a href={loginUrl} className={`${linkBase} ${linkInactive}`}>
               Iniciar sesión
             </a>
           )}
@@ -133,7 +150,9 @@ export default function Navbar() {
                 end={l.end}
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
-                  `py-2 ${isActive ? "font-semibold text-gray-900" : "text-gray-700"}`
+                  `py-2 ${
+                    isActive ? "font-semibold text-gray-900" : "text-gray-700"
+                  }`
                 }
               >
                 {l.label}
@@ -146,13 +165,23 @@ export default function Navbar() {
                   to="/profile"
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    `py-2 ${
+                    `py-2 flex items-center gap-2 ${
                       isActive ? "font-semibold text-gray-900" : "text-gray-700"
                     }`
                   }
                 >
-                  Mi perfil
+                  {userPic ? (
+                    <img
+                      src={userPic}
+                      alt="avatar"
+                      className="w-6 h-6 rounded-full object-cover border border-gray-200"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    "Mi perfil"
+                  )}
                 </NavLink>
+
                 <a
                   href={logoutUrl}
                   onClick={() => setOpen(false)}

@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
 
     # Proyecto
-    "SE_donations",
     "SE_sales",
     "SE_services",
     "SE_contact",
@@ -144,11 +143,12 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # Cookies en desarrollo (ajusta para producción con HTTPS)
-SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = False
+CORS_ALLOW_CREDENTIALS = True
 
 # Mantén los slashes de Django
 APPEND_SLASH = True
@@ -189,9 +189,6 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-# Adaptador para redirección dinámica al frontend
-ACCOUNT_ADAPTER = "SE_users.adapters.CustomAccountAdapter"
-SOCIALACCOUNT_ADAPTER = "SE_users.social_adapter.CustomSocialAccountAdapter" 
 
 # Logging de allauth en desarrollo
 LOGGING = {
@@ -206,6 +203,14 @@ LOGGING = {
 
 LOGIN_REDIRECT_URL = "http://localhost:5173/profile"
 LOGOUT_REDIRECT_URL = "http://localhost:5173"
+
+# Esto es para producción con HTTPS
+'''SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+DEBUG = False
+ALLOWED_HOSTS = ["tu-dominio.cl"]'''
 
 
 # ──────────────────────────────────────────────────────────────────────────────

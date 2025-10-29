@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.db.models import Sum
 
@@ -25,6 +26,12 @@ class Order(models.Model):
     customer_name  = models.CharField(max_length=255, blank=True)
     customer_email = models.EmailField(blank=True)
     total_amount   = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='orders'
+    )
 
     def __str__(self):
         return f"Order #{self.pk} – {self.customer_name or 'sin nombre'}"
@@ -68,12 +75,12 @@ class OrderItem(models.Model):
 
     # --- Lógica de totales ---
     def save(self, *args, **kwargs):
-        # Calcula el total de línea antes de guardar
+        if self.price_at is None:  # o: if not self.price_at
+            self.price_at = self.product.price
         self.line_total = (self.qty or 0) * (self.price_at or 0)
         super().save(*args, **kwargs)
-        # Recalcula el total de la orden
         self.order.recompute_total()
-
+        
     def delete(self, *args, **kwargs):
         order = self.order
         super().delete(*args, **kwargs)

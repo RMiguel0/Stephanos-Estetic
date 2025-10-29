@@ -10,7 +10,7 @@ export default function Footer() {
           <h4 className="font-semibold mb-2">Contacto</h4>
           <ul className="text-gray-600 space-y-1">
             <li>+56 9 7344 5731</li>
-            <li>contacto@stephanos.cl</li>
+            <li>stephanosestetic@gmail.com</li>
           </ul>
         </div>
         <div>

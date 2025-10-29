@@ -23,7 +23,7 @@ function getCookie(name) {
 }
 
 async function ensureCsrf() {
-  await fetch(`${API}/api/auth/csrf/`, { credentials: "include" });
+  await fetch(`${API_BASE}/api/auth/csrf/`, { credentials: "include" });
 }
 
 export default function UserProfile({ onNavigate }) {
@@ -36,20 +36,29 @@ export default function UserProfile({ onNavigate }) {
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({ full_name: "", phone: "" });
 
+  const goToOrders = () => {
+    if (onNavigate) {
+      onNavigate("orders"); // si te pasan el prop, úsalo
+    } else {
+      navigate("/orders"); // si no, navega con react-router
+    }
+  };
+
   useEffect(() => {
     async function fetchAll() {
+      setError("");
       try {
         await ensureCsrf();
 
         // 1) Chequea sesión por flag (no por status 401)
-        const meRes = await fetch(`${API}/api/user/me/`, {
+        const meRes = await fetch(`${API_BASE}/api/user/me/`, {
           credentials: "include",
         });
         const me = await meRes.json();
 
         if (!me?.is_authenticated) {
           // sin sesión -> manda directo al flujo de Google o a /login
-          window.location.href = `${API.replace(
+          window.location.href = `${API_BASE.replace(
             /\/$/,
             ""
           )}/accounts/google/login/`;
@@ -57,12 +66,13 @@ export default function UserProfile({ onNavigate }) {
         }
 
         // 2) Carga perfil si existe; si no, usa datos de /user/me/ SIN marcar error
-        const profRes = await fetch(`${API}/api/profile/`, {
+        const profRes = await fetch(`${API_BASE}/api/profile/`, {
           credentials: "include",
         });
 
         if (profRes.ok) {
           const data = await profRes.json();
+
           const safe = {
             full_name:
               data.full_name ??
@@ -70,6 +80,7 @@ export default function UserProfile({ onNavigate }) {
                 me.username),
             email: data.email ?? me.email ?? "",
             phone: data.phone ?? "",
+            picture: data.picture ?? "",
             created_at: data.created_at ?? "",
           };
           setProfile(safe);
@@ -77,6 +88,7 @@ export default function UserProfile({ onNavigate }) {
             full_name: safe.full_name || "",
             phone: safe.phone || "",
           });
+          setError("");
         } else {
           // No hay endpoint /api/profile -> no lo consideres error
           const safe = {
@@ -111,7 +123,7 @@ export default function UserProfile({ onNavigate }) {
       await ensureCsrf();
       const csrf = getCookie("csrftoken") || "";
 
-      const res = await fetch(`${API}/api/profile/`, {
+      const res = await fetch(`${API_BASE}/api/profile/`, {
         method: "PUT",
         credentials: "include",
         headers: {
@@ -188,9 +200,19 @@ export default function UserProfile({ onNavigate }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 text-center">
-              <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-pink-100 to-pink-200 rounded-full mb-4">
-                <User className="h-12 w-12 text-pink-600" />
+              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full mb-4 overflow-hidden bg-gradient-to-br from-pink-100 to-pink-200">
+                {profile.picture ? (
+                  <img
+                    src={profile.picture}
+                    alt={profile.full_name || "Foto de perfil"}
+                    className="object-cover w-full h-full"
+                    referrerPolicy="no-referrer" // evita bloqueos de imagen Google
+                  />
+                ) : (
+                  <User className="h-12 w-12 text-pink-600" />
+                )}
               </div>
+
               <h2 className="text-xl font-bold text-gray-900 mb-1">
                 {profile.full_name || "Usuario"}
               </h2>
@@ -198,16 +220,10 @@ export default function UserProfile({ onNavigate }) {
 
               <div className="space-y-2">
                 <button
-                  onClick={() => onNavigate && onNavigate("orders")}
+                  onClick={goToOrders}
                   className="w-full px-4 py-2 bg-pink-50 text-pink-600 rounded-lg font-semibold hover:bg-pink-100 transition-all"
                 >
                   Ver mis pedidos
-                </button>
-                <button
-                  onClick={() => onNavigate && onNavigate("services")}
-                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-all"
-                >
-                  Reservar un servicio
                 </button>
               </div>
             </div>

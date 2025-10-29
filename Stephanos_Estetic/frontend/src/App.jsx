@@ -12,6 +12,8 @@ import CheckoutSuccess from "./pages/CheckoutSuccess.jsx";
 import Login from "./pages/Login.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import Register from "./pages/Register.jsx";
+import Orders from "./pages/Orders.jsx";
+
 
 export default function App() {
   return (
@@ -29,6 +31,7 @@ export default function App() {
           <Route path="/profile" element={<div className="site-container py-8"><UserProfile /></div>} />
           <Route path="/cart" element={<div className="site-container py-8"><Cart /></div>} />
           <Route path="/checkout/success" element={<CheckoutSuccess />} />
+          <Route path="/orders" element={<div className="site-container py-8"><Orders /></div>} />
         </Routes>
       </main>
       <Footer />

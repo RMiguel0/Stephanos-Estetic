@@ -83,7 +83,7 @@ export default function Contact() {
             <h3 className="text-lg font-bold text-gray-900 mb-2">Email</h3>
             <p className="text-gray-600 mb-3">Escríbenos en cualquier momento</p>
             <a href="mailto:info@bellavita.com" className="text-pink-600 hover:text-pink-700 font-semibold">
-              contacto@stephanos.cl
+              stephanosestetic@gmail.com
             </a>
           </div>
 

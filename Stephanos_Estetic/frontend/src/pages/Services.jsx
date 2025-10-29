@@ -230,13 +230,13 @@ export default function Services() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            Our{" "}
+            Nuestros{" "}
             <span className="bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent">
-              Services
+              Servicios
             </span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Book your personalized coaching or beauty session with our expert team
+            Reserva tu sesión de coaching o belleza personalizada con nuestro equipo de expertos
           </p>
         </div>
 
@@ -254,7 +254,7 @@ export default function Services() {
                 </div>
                 <div className="p-6">
                   <div className="inline-block px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-semibold mb-3 uppercase">
-                    {service.type || "service"}
+                    {service.type || "servicio"}
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{service.name}</h3>
                   <p className="text-gray-600 mb-4 line-clamp-2">{service.description}</p>
@@ -271,7 +271,7 @@ export default function Services() {
                     </div>
                   </div>
                   <button className="w-full mt-4 px-4 py-2 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all">
-                    Book Now
+                    Reservar Ahora
                   </button>
                 </div>
               </div>
@@ -287,7 +287,7 @@ export default function Services() {
               }}
               className="mb-6 text-pink-600 hover:text-pink-700 font-semibold flex items-center"
             >
-              ← Back to Services
+              ← Volver a Servicios
             </button>
 
             <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
@@ -305,7 +305,7 @@ export default function Services() {
                       : selectedService.price}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {selectedService.duration_minutes} minutes
+                    {selectedService.duration_minutes} minutos
                   </div>
                 </div>
               </div>
@@ -316,12 +316,12 @@ export default function Services() {
               <div className="bg-white rounded-2xl shadow-lg p-8">
                 <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                   <Calendar className="h-6 w-6 mr-2 text-pink-600" />
-                  Available Time Slots
+                  Horarios Disponibles
                 </h3>
 
                 {schedules.length === 0 ? (
                   <p className="text-center text-gray-500 py-8">
-                    No available slots at the moment. Please check back later.
+                    No hay horarios disponibles en este momento. Por favor, revisa más tarde.
                   </p>
                 ) : (
                   <div className="space-y-4">
@@ -351,7 +351,7 @@ export default function Services() {
               <div className="bg-white rounded-2xl shadow-lg p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-2xl font-bold text-gray-900">
-                    Complete Your Booking
+                    Completa tu Reserva
                   </h3>
                   <button
                     onClick={() => setSelectedSchedule(null)}
@@ -362,9 +362,9 @@ export default function Services() {
                 </div>
 
                 <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-gray-600 mb-1">Selected Time:</p>
+                  <p className="text-sm text-gray-600 mb-1">Hora Seleccionada:</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {formatDate(selectedSchedule.date)} at{" "}
+                    {formatDate(selectedSchedule.date)} a las{" "}
                     {formatTime(selectedSchedule.start_time)}
                   </p>
                 </div>
@@ -373,10 +373,10 @@ export default function Services() {
                   <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
                     <Check className="h-12 w-12 text-green-600 mx-auto mb-3" />
                     <h4 className="text-xl font-bold text-green-900 mb-2">
-                      Booking Confirmed!
+                      ¡Reserva Confirmada!
                     </h4>
                     <p className="text-green-700">
-                      We'll send you a confirmation email shortly.
+                      Te enviaremos un correo electrónico de confirmación en breve.
                     </p>
                   </div>
                 ) : (
@@ -389,7 +389,7 @@ export default function Services() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Full Name *
+                        Nombre Completo *
                       </label>
                       <input
                         type="text"
@@ -407,7 +407,7 @@ export default function Services() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email *
+                        Correo Electrónico *
                       </label>
                       <input
                         type="email"
@@ -425,7 +425,7 @@ export default function Services() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone
+                        Teléfono *
                       </label>
                       <input
                         type="tel"
@@ -442,7 +442,7 @@ export default function Services() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Special Requests or Notes
+                        Solicitudes Especiales o Notas
                       </label>
                       <textarea
                         rows={4}
@@ -461,7 +461,7 @@ export default function Services() {
                       type="submit"
                       className="w-full px-6 py-4 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
                     >
-                      Confirm Booking
+                      Confirmar Reserva
                     </button>
                   </form>
                 )}
