@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 
 // Utils: backend base y helpers
-const API = "http://localhost:8000"; // backend Django
+const API_BASE =
+  window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:8000"
+    : "http://localhost:8000";
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;
@@ -36,27 +39,30 @@ export default function UserProfile({ onNavigate }) {
   useEffect(() => {
     async function fetchAll() {
       try {
-        // 1) Garantiza CSRF (por si luego hacemos PUT)
         await ensureCsrf();
 
-        // 2) Chequea sesión
+        // 1) Chequea sesión por flag (no por status 401)
         const meRes = await fetch(`${API}/api/user/me/`, {
           credentials: "include",
         });
-        if (meRes.status === 401) {
-          navigate("/login");
-          return;
-        }
         const me = await meRes.json();
 
-        // 3) Carga perfil (si tu endpoint existe). Si no existe, usa datos básicos de /user/me/
+        if (!me?.is_authenticated) {
+          // sin sesión -> manda directo al flujo de Google o a /login
+          window.location.href = `${API.replace(
+            /\/$/,
+            ""
+          )}/accounts/google/login/`;
+          return;
+        }
+
+        // 2) Carga perfil si existe; si no, usa datos de /user/me/ SIN marcar error
         const profRes = await fetch(`${API}/api/profile/`, {
           credentials: "include",
         });
 
         if (profRes.ok) {
           const data = await profRes.json();
-          // fallback por si el backend no retorna todos estos campos
           const safe = {
             full_name:
               data.full_name ??
@@ -72,7 +78,7 @@ export default function UserProfile({ onNavigate }) {
             phone: safe.phone || "",
           });
         } else {
-          // Sin /api/profile/ o error: arma un “perfil” desde /user/me/
+          // No hay endpoint /api/profile -> no lo consideres error
           const safe = {
             full_name:
               `${me.first_name || ""} ${me.last_name || ""}`.trim() ||
@@ -86,17 +92,11 @@ export default function UserProfile({ onNavigate }) {
         }
       } catch (err) {
         setError("No se pudo cargar el perfil.");
-        setProfile({
-          full_name: "",
-          email: "",
-          phone: "",
-          created_at: "",
-        });
+        setProfile({ full_name: "", email: "", phone: "", created_at: "" });
       } finally {
         setLoading(false);
       }
     }
-
     fetchAll();
   }, [navigate]);
 
@@ -174,9 +174,9 @@ export default function UserProfile({ onNavigate }) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            My{" "}
+            Mi{" "}
             <span className="bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent">
-              Profile
+              Perfil
             </span>
           </h1>
           <p className="text-gray-600">
@@ -192,7 +192,7 @@ export default function UserProfile({ onNavigate }) {
                 <User className="h-12 w-12 text-pink-600" />
               </div>
               <h2 className="text-xl font-bold text-gray-900 mb-1">
-                {profile.full_name || "User"}
+                {profile.full_name || "Usuario"}
               </h2>
               <p className="text-sm text-gray-600 mb-6">{profile.email}</p>
 

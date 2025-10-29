@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     "import_export",
 
     # Auth sites/allauth
-    "django.contrib.sites",              # <- requerido por allauth
+    "django.contrib.sites",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -65,7 +65,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "allauth.account.middleware.AccountMiddleware",   # ← AÑADIR AQUÍ
+    "allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -79,12 +79,12 @@ WSGI_APPLICATION = "Stephanos_Estetic.wsgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],  # si usas templates del admin/auth
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.debug",
-                "django.template.context_processors.request",  # <- necesario para allauth
+                "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
@@ -115,7 +115,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # ──────────────────────────────────────────────────────────────────────────────
 # I18N / TZ
 # ──────────────────────────────────────────────────────────────────────────────
-LANGUAGE_CODE = "en-us"               # puedes cambiar a "es-cl" si quieres
+LANGUAGE_CODE = "es-cl"
 TIME_ZONE = "America/Santiago"
 USE_I18N = True
 USE_TZ = True
@@ -134,7 +134,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
-CORS_ALLOW_CREDENTIALS = True  # permite enviar cookies (csrftoken / session)
+CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
@@ -148,7 +148,7 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
-CSRF_COOKIE_HTTPONLY = False  # False si lees csrftoken desde JS
+CSRF_COOKIE_HTTPONLY = True
 
 # Mantén los slashes de Django
 APPEND_SLASH = True
@@ -173,36 +173,40 @@ REST_FRAMEWORK = {
 # ──────────────────────────────────────────────────────────────────────────────
 # Auth / allauth
 # ──────────────────────────────────────────────────────────────────────────────
-LOGIN_URL = "/accounts/login/"
-# En dev redirigimos al frontend SPA
-LOGIN_REDIRECT_URL = os.getenv("LOGIN_REDIRECT_URL", "http://localhost:5173/profile")
-LOGOUT_REDIRECT_URL = os.getenv("LOGOUT_REDIRECT_URL", "http://localhost:5173")
-
 SITE_ID = 1
-AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
-]
 
-# allauth básicos en dev
-ACCOUNT_EMAIL_VERIFICATION = "none"
-ACCOUNT_LOGIN_METHOD = "username_email" 
-ACCOUNT_SIGNUP_FIELDS = ["username", "email", "password1", "password2"]
-SOCIALACCOUNT_LOGIN_ON_GET = True  # clic y va directo a Google
-ACCOUNT_LOGOUT_ON_GET = True    # clic y va directo al logout
+# allauth: solo login social (Google)
+ACCOUNT_SIGNUP_FIELDS         = ['email*', 'password1*', 'password2*']
+ACCOUNT_LOGIN_METHODS         = {'email'}
+SOCIALACCOUNT_LOGIN_ON_GET    = True
+ACCOUNT_LOGOUT_ON_GET         = True
+ACCOUNT_EMAIL_VERIFICATION    = "none"
 
-# Carga de credenciales de Google desde .env (evita usar admin si quieres todo en código)
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
-        "APP": {
-            "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
-            "secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
-            "key": "",
-        },
-        "SCOPE": ["profile", "email"],
-        "AUTH_PARAMS": {"access_type": "offline"},
+        "SCOPE": ["email", "profile"],
+        "AUTH_PARAMS": {"access_type": "online"},
     }
 }
+
+# Adaptador para redirección dinámica al frontend
+ACCOUNT_ADAPTER = "SE_users.adapters.CustomAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "SE_users.social_adapter.CustomSocialAccountAdapter" 
+
+# Logging de allauth en desarrollo
+LOGGING = {
+    "version": 1,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "allauth": {"handlers": ["console"], "level": "DEBUG"},
+        "allauth.socialaccount": {"handlers": ["console"], "level": "DEBUG"},
+        "django.request": {"handlers": ["console"], "level": "ERROR"},
+    },
+}
+
+LOGIN_REDIRECT_URL = "http://localhost:5173/profile"
+LOGOUT_REDIRECT_URL = "http://localhost:5173"
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Constantes del proyecto

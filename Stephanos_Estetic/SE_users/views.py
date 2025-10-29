@@ -1,8 +1,8 @@
+# SE_users/views.py
 from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 from django.middleware.csrf import get_token
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth import logout
 
 @ensure_csrf_cookie
@@ -11,10 +11,12 @@ def csrf_view(request):
     get_token(request)
     return JsonResponse({"detail": "CSRF cookie set"})
 
-@login_required
 @require_GET
 def current_user(request):
     u = request.user
+    if not u.is_authenticated:
+        # Para SPA es más práctico responder 200 con flag
+        return JsonResponse({"is_authenticated": False})
     return JsonResponse({
         "id": u.id,
         "username": u.username,
@@ -25,8 +27,6 @@ def current_user(request):
         "is_authenticated": True,
     })
 
-
-@csrf_protect
 @require_GET
 def logout_api(request):
     logout(request)
