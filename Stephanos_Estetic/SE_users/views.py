@@ -86,35 +86,39 @@ class ProfileView(View):
         
 @method_decorator([login_required], name="dispatch")
 class UserOrdersView(View):
-    """GET -> retorna las órdenes (historial de compras) del usuario autenticado"""
+    """GET -> historial de compras del usuario autenticado."""
 
     def get(self, request):
         histories = (
             UserOrderHistory.objects
-            .filter(user=request.user)
+            .filter(user=request.user, order__status="paid")  # <- opcional
             .select_related("order")
+            .prefetch_related("order__items__product")       # <- evita N+1
             .order_by("-viewed_at")
         )
 
-        data = []
+        orders = []
         for h in histories:
             o = h.order
-            data.append({
+            items = [
+                {
+                    "product": it.product.name,
+                    "qty": int(it.qty),
+                    "price_at": float(it.price_at),
+                    "line_total": float(it.line_total),
+                }
+                for it in o.items.all()
+            ]
+            orders.append({
                 "order_id": o.id,
-                "customer_name": o.customer_name,
-                "customer_email": o.customer_email,
+                "customer_name": o.customer_name or "",
+                "customer_email": o.customer_email or "",
                 "total_amount": float(o.total_amount),
-                "created_at": o.created_at,
-                "viewed_at": h.viewed_at,
-                # si quieres, también sus items:
-                "items": [
-                    {
-                        "product": i.product.name,
-                        "qty": i.qty,
-                        "price_at": float(i.price_at),
-                        "line_total": float(i.line_total),
-                    }
-                    for i in o.items.all()
-                ],
+                "status": o.status,
+                "created_at": o.created_at.isoformat(),
+                "paid_at": o.paid_at.isoformat() if o.paid_at else None,
+                "viewed_at": h.viewed_at.isoformat(),
+                "items": items,
             })
-        return JsonResponse({"orders": data})
+
+        return JsonResponse({"orders": orders})

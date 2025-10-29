@@ -1,10 +1,28 @@
 import { useCart } from "../context/CartContext.jsx";
 import { Trash2, Plus, Minus } from "lucide-react";
 
+// === Helpers CSRF y base API ===
+const API_BASE =
+  window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:8000"
+    : "http://localhost:8000";
+
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(";").shift();
+  return null;
+}
+
+async function ensureCsrf() {
+  // tu endpoint Django que setea la cookie CSRF
+  await fetch(`${API_BASE}/api/auth/csrf/`, { credentials: "include" });
+}
+
 export default function Cart() {
   const { items, updateQty, removeItem, clearCart, subtotal } = useCart();
 
-  const shipping = subtotal > 50000 || subtotal === 0 ? 0 : 3990; // ejemplo
+  const shipping = subtotal > 50000 || subtotal === 0 ? 0 : 3990;
   const total = subtotal + shipping;
 
   if (items.length === 0) {
@@ -18,30 +36,32 @@ export default function Cart() {
     );
   }
 
-
-
+  // --- Lógica del botón “Ir a pagar” ---
   async function handleCheckout() {
     if (items.length === 0) return;
 
-    // Construye el payload que usa tu backend (por si más adelante lo amplías)
+    // Payload con IDs y cantidades reales
     const payload = {
       items: items.map((it) => ({
-        sku: it.sku || it.id,
+        product_id: it.id, // id del producto en la BD
         qty: Math.max(1, Number(it.qty) || 1),
       })),
     };
 
     try {
-      // Calcula el total directamente desde tu carrito (si ya lo tienes en una variable total)
-      const totalAmount = Math.round(
-        items.reduce((acc, it) => acc + it.price * it.qty, 0)
-      ) + 3990; // <-- si sumas el envío fijo de $3.990
+      // 1️⃣ Asegurar CSRF
+      await ensureCsrf();
+      const csrf = getCookie("csrftoken") || "";
 
-      // 1️⃣ Llamada al backend para crear transacción Webpay
-      const res = await fetch("http://localhost:8000/api/payments/create", {
+      // 2️⃣ Enviar carrito al backend para crear la orden
+      const res = await fetch(`${API_BASE}/api/payments/create`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: totalAmount }),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrf,
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -50,10 +70,9 @@ export default function Cart() {
         return;
       }
 
-      // 2️⃣ Backend responde con url + token
       const { url, token } = await res.json();
 
-      // 3️⃣ Crea formulario temporal para redirigir a Webpay
+      // 3️⃣ Redirigir al formulario Webpay con token_ws
       const form = document.createElement("form");
       form.method = "POST";
       form.action = url;
@@ -70,11 +89,12 @@ export default function Cart() {
       console.error("Error al crear pago:", err);
       alert(`Error de conexión: ${err.message}`);
     }
-  };
+  }
+
   return (
     <section className="min-h-screen bg-gradient-to-b from-white to-pink-50 py-8">
       <div className="site-container grid lg:grid-cols-3 gap-8">
-        {/* Lista */}
+        {/* Lista de productos */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
           <div className="p-6 flex items-center justify-between">
             <h1 className="text-2xl font-bold">Tu carrito</h1>
@@ -154,7 +174,7 @@ export default function Cart() {
           </div>
         </div>
 
-        {/* Resumen */}
+        {/* Resumen de compra */}
         <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 h-fit">
           <h2 className="text-xl font-bold">Resumen</h2>
           <div className="mt-4 space-y-2 text-sm">
@@ -189,6 +209,7 @@ export default function Cart() {
   );
 }
 
+// === Helpers ===
 function formatPrice(n) {
   if (typeof n !== "number") return n ?? "";
   try {
@@ -201,6 +222,7 @@ function formatPrice(n) {
     return `$${n}`;
   }
 }
+
 function labelize(s) {
   return String(s || "")
     .replace(/[_-]/g, " ")

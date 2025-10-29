@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Calendar, Package, AlertCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
-// misma base que en UserProfile.jsx
 const API_BASE =
   window.location.hostname === "127.0.0.1"
     ? "http://127.0.0.1:8000"
@@ -12,27 +10,17 @@ export default function Orders({ onNavigate }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
-
-  const goToServices = () => {
-    if (onNavigate) {
-      onNavigate("services"); // si te pasan el prop, úsalo
-    } else {
-      navigate("/services"); // si no, navega con react-router
-    }
-  };
 
   useEffect(() => {
     async function fetchOrders() {
       setError("");
       try {
-        // primero valida sesión
+        // 1️⃣ validar sesión
         const meRes = await fetch(`${API_BASE}/api/user/me/`, {
           credentials: "include",
         });
         const me = await meRes.json();
         if (!me?.is_authenticated) {
-          // sin sesión -> redirige a login
           window.location.href = `${API_BASE.replace(
             /\/$/,
             ""
@@ -40,7 +28,7 @@ export default function Orders({ onNavigate }) {
           return;
         }
 
-        // luego carga órdenes
+        // 2️⃣ obtener historial de compras
         const res = await fetch(`${API_BASE}/api/orders/`, {
           credentials: "include",
         });
@@ -54,28 +42,24 @@ export default function Orders({ onNavigate }) {
         setLoading(false);
       }
     }
-
     fetchOrders();
   }, []);
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("es-CL", {
+  const formatDate = (d) =>
+    new Date(d).toLocaleDateString("es-CL", {
       year: "numeric",
       month: "long",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
 
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-pink-50 py-12">
@@ -84,11 +68,11 @@ export default function Orders({ onNavigate }) {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Mis{" "}
             <span className="bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent">
-              Órdenes
+              Compras
             </span>
           </h1>
           <p className="text-gray-600">
-            Revisa tus compras o contrataciones de servicios
+            Revisa tus órdenes y compras realizadas
           </p>
         </div>
 
@@ -103,14 +87,14 @@ export default function Orders({ onNavigate }) {
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center border border-gray-100">
             <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              No hay órdenes aún
+              No hay compras aún
             </h3>
             <p className="text-gray-600 mb-6">
-              Aún no has realizado compras ni contrataciones. ¡Explora nuestros
-              servicios y haz tu primera reserva o pedido!
+              Aún no has realizado ninguna compra. ¡Explora nuestros productos y
+              servicios!
             </p>
             <button
-              onClick={goToServices}
+              onClick={() => onNavigate && onNavigate("services")}
               className="px-6 py-3 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
             >
               Explorar servicios
@@ -141,21 +125,20 @@ export default function Orders({ onNavigate }) {
                         ${o.total_amount.toFixed(0)}
                       </div>
                       <div className="text-sm text-gray-500">
-                        Realizada el {formatDate(o.created_at)}
+                        Pagada el {formatDate(o.paid_at || o.created_at)}
                       </div>
                     </div>
                   </div>
 
-                  {/* Detalle de ítems */}
                   {o.items && o.items.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                        Productos / Servicios
+                        Productos
                       </h4>
                       <ul className="divide-y divide-gray-100">
-                        {o.items.map((item, idx) => (
+                        {o.items.map((item, i) => (
                           <li
-                            key={idx}
+                            key={i}
                             className="py-2 flex justify-between text-sm text-gray-700"
                           >
                             <span>
@@ -168,17 +151,13 @@ export default function Orders({ onNavigate }) {
                     </div>
                   )}
 
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-start">
-                      <Calendar className="h-5 w-5 text-pink-500 mr-3 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">
-                          Última actualización
-                        </p>
-                        <p className="text-gray-900">
-                          {formatDate(o.viewed_at)}
-                        </p>
-                      </div>
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex items-start">
+                    <Calendar className="h-5 w-5 text-pink-500 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">
+                        Última actualización
+                      </p>
+                      <p className="text-gray-900">{formatDate(o.viewed_at)}</p>
                     </div>
                   </div>
                 </div>
@@ -189,10 +168,11 @@ export default function Orders({ onNavigate }) {
 
         <div className="mt-8 bg-gradient-to-r from-pink-500 to-pink-600 rounded-2xl p-8 text-center text-white shadow-lg">
           <h3 className="text-2xl font-bold mb-3">
-            ¿Necesitas ayuda con tu pedido?
+            ¿Necesitas ayuda con tus compras?
           </h3>
           <p className="text-pink-100 mb-6">
-            Si tienes dudas o necesitas asistencia con una orden, contáctanos.
+            Si tienes dudas o necesitas asistencia, nuestro equipo está para
+            ayudarte.
           </p>
           <button
             onClick={() => onNavigate && onNavigate("contact")}

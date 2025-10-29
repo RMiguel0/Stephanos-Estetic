@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
+from django.utils import timezone
+from django.db import transaction
 
 
 class Product(models.Model):
@@ -19,6 +21,15 @@ class Product(models.Model):
         constraints = [
             models.CheckConstraint(check=models.Q(price__gte=0), name="product_price_gte_0"),
         ]
+    
+    def consume_stock(self, qty: int):
+        """Descuenta stock de forma segura dentro de una transacción."""
+        if qty <= 0:
+            return
+        if self.stock < qty:
+            raise ValueError(f"Stock insuficiente para {self.name}")
+        self.stock = models.F("stock") - qty
+        self.save(update_fields=["stock"])
 
 
 class Order(models.Model):
@@ -32,6 +43,8 @@ class Order(models.Model):
         on_delete=models.SET_NULL,
         related_name='orders'
     )
+    status = models.CharField(max_length=32, default='pending', db_index=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Order #{self.pk} – {self.customer_name or 'sin nombre'}"
@@ -49,6 +62,28 @@ class Order(models.Model):
         if save:
             self.save(update_fields=["total_amount"])
         return total
+    
+    @transaction.atomic
+    def mark_paid(self, user=None):
+        """Marca la orden como pagada y descuenta stock (idempotente)."""
+        if self.status == "paid":
+            return self  # ya procesada → idempotencia
+
+        # Descontar stock
+        for item in self.items.select_related("product").select_for_update():
+            item.product.consume_stock(item.qty)
+
+        # Marcar pagada
+        self.status = "paid"
+        self.paid_at = timezone.now()
+        self.save(update_fields=["status", "paid_at"])
+
+        # Registrar en historial
+        if user:
+            from SE_users.models import UserOrderHistory
+            UserOrderHistory.objects.get_or_create(user=user, order=self)
+
+        return self
 
 
 class OrderItem(models.Model):
