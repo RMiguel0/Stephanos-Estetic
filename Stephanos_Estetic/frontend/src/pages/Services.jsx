@@ -330,7 +330,7 @@ export default function Services() {
                       <DollarSign className="h-4 w-4" />
                       <span>
                         {typeof service?.price === "number"
-                          ? `$${service.price}`
+                          ? `${service.price}`
                           : service?.price}
                       </span>
                     </div>
