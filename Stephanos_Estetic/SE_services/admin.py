@@ -1,9 +1,10 @@
+# SE_services/admin.py
 from django.contrib import admin
-from .models import ServiceProvider, Service, AvailabilitySlot, Booking
+from .models import Service, AvailabilitySlot, Booking
 
 class AvailabilitySlotInline(admin.TabularInline):
     model = AvailabilitySlot
-    extra = 4  # muestra 4 filas vacías para crear rápido
+    extra = 4
     fields = ("starts_at", "ends_at", "is_active")
     ordering = ("starts_at",)
 
@@ -13,25 +14,21 @@ class BookingInline(admin.StackedInline):
     can_delete = False
     readonly_fields = ("customer_name", "customer_email", "status", "created_at")
 
-@admin.register(ServiceProvider)
-class ProviderAdmin(admin.ModelAdmin):
-    list_display = ("id", "display_name", "user")
-    search_fields = ("display_name", "user__username")
-
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "provider", "duration_minutes", "price", "active")
-    list_filter = ("provider", "active")
-    search_fields = ("name",)
-    inlines = [AvailabilitySlotInline]  # crea slots directo desde el servicio
+    list_display = ("id", "name", "slug", "duration_minutes", "price", "active")
+    list_filter = ("active",)
+    search_fields = ("name", "slug", "description")
+    prepopulated_fields = {"slug": ("name",)}
+    inlines = [AvailabilitySlotInline]
 
 @admin.register(AvailabilitySlot)
 class SlotAdmin(admin.ModelAdmin):
-    list_display = ("id", "provider", "service", "starts_at", "ends_at", "is_active")
-    list_filter = ("provider", "service", "is_active")
-    search_fields = ("provider__display_name", "service__name")
+    list_display = ("id", "service", "starts_at", "ends_at", "is_active")
+    list_filter = ("service", "is_active")
+    search_fields = ("service__name",)
     date_hierarchy = "starts_at"
-    inlines = [BookingInline]  # ver la reserva asociada, si existe
+    inlines = [BookingInline]
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
