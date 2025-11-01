@@ -1,7 +1,6 @@
 import { Heart, Sparkles, Users, Award } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
-import logo from "../assets/logo.svg";
-
+import logo from "../assets/logo_SE.svg";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -38,11 +37,15 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center p-1 rounded-full mb-6">
-              <img src={logo} alt="Stephanos Estetic logo" className="h-40 w-40" />
+            <div className="inline-flex items-center justify-center">
+              <img
+                src={logo}
+                alt="Stephanos Estetic logo"
+                className="block mx-auto h-auto w-full max-w-[40rem] md:max-w-[48rem]"
+              />
             </div>
             <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-              Bienvenido a {" "}
+              Bienvenido a{" "}
               <span className="bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent">
                 Stephanos Estetic
               </span>
