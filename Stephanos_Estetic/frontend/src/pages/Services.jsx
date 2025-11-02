@@ -56,8 +56,14 @@ export default function Services() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
 
+  // Estado del usuario actual (para autocompletar datos). currentUser null si no autenticado.
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userLoading, setUserLoading] = useState(true);
+
   useEffect(() => {
     fetchServices();
+    // cargar perfil del usuario para autocompletar, si está logueado
+    fetchMe();
   }, []);
 
   useEffect(() => {
@@ -70,6 +76,30 @@ export default function Services() {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
+  };
+
+  // Obtiene el usuario autenticado (si existe)
+  const fetchMe = async () => {
+    setUserLoading(true);
+    try {
+      const res = await fetch("/api/user/me/", { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data?.is_authenticated) {
+        setCurrentUser({
+          id: data.id,
+          name: data.full_name || data.username,
+          email: data.email,
+          phone: data.phone || "",
+        });
+      } else {
+        setCurrentUser(null);
+      }
+    } catch (e) {
+      setCurrentUser(null);
+    } finally {
+      setUserLoading(false);
+    }
   };
 
   const fetchServices = async () => {
@@ -194,13 +224,23 @@ export default function Services() {
     if (!selectedSchedule) return;
     setError("");
 
-    const booking = {
-      service_schedule_id: selectedSchedule.id,
-      customer_name: bookingForm.customer_name,
-      customer_email: bookingForm.customer_email,
-      customer_phone: bookingForm.customer_phone,
-      notes: bookingForm.notes,
-    };
+    // Arma el payload según el usuario autenticado
+    let booking;
+    if (currentUser) {
+      // solo enviamos notas y el slot; el backend llenará datos desde sesión
+      booking = {
+        service_schedule_id: selectedSchedule.id,
+        notes: bookingForm.notes,
+      };
+    } else {
+      booking = {
+        service_schedule_id: selectedSchedule.id,
+        customer_name: bookingForm.customer_name,
+        customer_email: bookingForm.customer_email,
+        customer_phone: bookingForm.customer_phone,
+        notes: bookingForm.notes,
+      };
+    }
 
     try {
       await fetch("/api/csrf/", { credentials: "include" });
@@ -218,7 +258,14 @@ export default function Services() {
         const msg = await res.text();
         throw new Error(msg || `HTTP ${res.status}`);
       }
+      const data = await res.json();
+      // Si el backend devuelve una URL para Webpay, redirigimos al pago
+      if (data?.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
+      }
 
+      // fallback: mostrar éxito localmente
       setShowSuccess(true);
       setBookingForm({
         customer_name: "",
@@ -227,7 +274,7 @@ export default function Services() {
         notes: "",
       });
       setSelectedSchedule(null);
-      if (selectedService) fetchSchedules(selectedService.id); // refresca la grilla
+      if (selectedService) fetchSchedules(selectedService.id);
 
       setTimeout(() => {
         setShowSuccess(false);
@@ -476,79 +523,126 @@ export default function Services() {
                       </div>
                     )}
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Nombre Completo *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={bookingForm.customer_name}
-                        onChange={(e) =>
-                          setBookingForm({
-                            ...bookingForm,
-                            customer_name: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
-                      />
-                    </div>
+                    {currentUser ? (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Nombre
+                            </label>
+                            <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                              {currentUser.name || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Correo
+                            </label>
+                            <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 break-all">
+                              {currentUser.email || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Teléfono
+                            </label>
+                            <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                              {currentUser.phone || "-"}
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Solicitudes Especiales o Notas
+                          </label>
+                          <textarea
+                            rows={4}
+                            value={bookingForm.notes}
+                            onChange={(e) =>
+                              setBookingForm({ ...bookingForm, notes: e.target.value })
+                            }
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all resize-none"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Nombre Completo *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={bookingForm.customer_name}
+                            onChange={(e) =>
+                              setBookingForm({
+                                ...bookingForm,
+                                customer_name: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Correo Electrónico *
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        value={bookingForm.customer_email}
-                        onChange={(e) =>
-                          setBookingForm({
-                            ...bookingForm,
-                            customer_email: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Correo Electrónico *
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            value={bookingForm.customer_email}
+                            onChange={(e) =>
+                              setBookingForm({
+                                ...bookingForm,
+                                customer_email: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Teléfono *
-                      </label>
-                      <input
-                        type="tel"
-                        value={bookingForm.customer_phone}
-                        onChange={(e) =>
-                          setBookingForm({
-                            ...bookingForm,
-                            customer_phone: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Teléfono *
+                          </label>
+                          <input
+                            type="tel"
+                            value={bookingForm.customer_phone}
+                            onChange={(e) =>
+                              setBookingForm({
+                                ...bookingForm,
+                                customer_phone: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                          />
+                        </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Solicitudes Especiales o Notas
-                      </label>
-                      <textarea
-                        rows={4}
-                        value={bookingForm.notes}
-                        onChange={(e) =>
-                          setBookingForm({
-                            ...bookingForm,
-                            notes: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all resize-none"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Solicitudes Especiales o Notas
+                          </label>
+                          <textarea
+                            rows={4}
+                            value={bookingForm.notes}
+                            onChange={(e) =>
+                              setBookingForm({
+                                ...bookingForm,
+                                notes: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all resize-none"
+                          />
+                        </div>
+                      </>
+                    )}
 
                     <button
                       type="submit"
-                      className="w-full px-6 py-4 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                      disabled={userLoading}
+                      className="w-full px-6 py-4 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       Confirmar Reserva
                     </button>

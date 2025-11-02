@@ -72,5 +72,18 @@ class Booking(models.Model):
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Datos de pago: se toma un abono (20%) en la reserva. Estos campos permiten
+    # registrar el valor total del servicio, el monto abonado y el estado de pago.
+    # service_price guarda el precio del servicio al momento de reservar (snapshot),
+    # deposit_amount es el abono a cobrar (en pesos CLP enteros),
+    # paid_amount es lo efectivamente pagado una vez confirmado el pago,
+    # payment_status indica el estado del pago con Webpay (PENDING, AUTHORIZED, FAILED),
+    # payment_token almacena el token de Webpay para recuperar el resultado en el commit.
+    service_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    deposit_amount = models.PositiveIntegerField(default=0)
+    paid_amount = models.PositiveIntegerField(default=0)
+    payment_status = models.CharField(max_length=16, default="PENDING")
+    payment_token = models.CharField(max_length=128, blank=True, default="")
+
     def __str__(self):
         return f"Reserva {self.id} {self.slot.starts_at:%Y-%m-%d %H:%M} ({self.status})"

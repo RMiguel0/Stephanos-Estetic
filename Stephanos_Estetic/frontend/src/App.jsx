@@ -13,6 +13,7 @@ import Login from "./pages/Login.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import Register from "./pages/Register.jsx";
 import Orders from "./pages/Orders.jsx";
+import BookingSuccess from "./pages/BookingSuccess.jsx";
 
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/cart" element={<div className="site-container py-8"><Cart /></div>} />
           <Route path="/checkout/success" element={<CheckoutSuccess />} />
           <Route path="/orders" element={<div className="site-container py-8"><Orders /></div>} />
+          <Route path="/services/booking-success" element={<BookingSuccess />} />
         </Routes>
       </main>
       <Footer />

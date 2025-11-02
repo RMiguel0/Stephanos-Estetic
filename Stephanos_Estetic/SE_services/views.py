@@ -1,5 +1,6 @@
 # views.py
 from rest_framework.decorators import api_view
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.response import Response
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -7,11 +8,18 @@ from django.views.decorators.http import require_GET, require_POST
 from django.utils import timezone
 from django.db import transaction
 from zoneinfo import ZoneInfo
+import zoneinfo
 from datetime import datetime, timedelta
 import json, re
 from django.utils.text import slugify
 
 from .models import Service, AvailabilitySlot, Booking
+from django.conf import settings
+from django.shortcuts import redirect
+from SE_payments.webpay_service import create_tx, commit_tx
+from .utils_email import send_booking_emails
+from .utils_gcal import insert_business_event
+from django.contrib.auth import get_user_model
 
 LOCAL_TZ = ZoneInfo("America/Santiago")
 UTC_TZ = ZoneInfo("UTC")
@@ -132,14 +140,15 @@ def service_schedules(request):
     return JsonResponse(items, safe=False)
 
 
+@csrf_exempt
 def create_booking(request):
     """
     POST /api/bookings/
     body JSON:
       { "service_schedule_id": <int>  // o "slot_id"
-        "customer_name": "...",
-        "customer_email": "...",
-        "customer_phone": "...",       // opcional (si existe en el modelo)
+        "customer_name": "...",        // requerido solo si NO hay sesión
+        "customer_email": "...",       // requerido solo si NO hay sesión
+        "customer_phone": "...",       // opcional
         "notes": "..." }               // opcional
     """
     # 1) Content-Type y carga JSON
@@ -162,58 +171,173 @@ def create_booking(request):
     except (ValueError, TypeError):
         return _jerror("slot_id inválido")
 
-    customer_name  = (payload.get("customer_name")  or "").strip()
-    customer_email = (payload.get("customer_email") or "").strip()
-    customer_phone = (payload.get("customer_phone") or "").strip()  # opcional
-    notes          = (payload.get("notes")          or "").strip()
-
-    if not customer_name or not customer_email:
-        return _jerror("customer_name y customer_email son obligatorios")
-
+    notes = (payload.get("notes") or "").strip()
     user = request.user if request.user.is_authenticated else None
 
-    # 3) Transacción + bloque de fila (anti doble-click)
-    from .models import AvailabilitySlot, Booking  # importa aquí para evitar ciclos
-
+    # 3) Transacción + bloqueo (evita doble click)
     try:
         with transaction.atomic():
-            slot = (AvailabilitySlot.objects
-                    .select_for_update()
-                    .select_related("service")
-                    .get(id=slot_id, is_active=True))
-            # doble reserva
+            slot = (
+                AvailabilitySlot.objects
+                .select_for_update()
+                .select_related("service")
+                .get(id=slot_id, is_active=True)
+            )
+
+            # Doble reserva
             if hasattr(slot, "booking"):
                 return _jerror("El horario ya fue tomado.", status=409)
 
-            # pasado (según zona local)
-            now_local = timezone.now().astimezone(LOCAL_TZ)
-            if slot.starts_at.astimezone(LOCAL_TZ) <= now_local:
+            # No permitir horarios pasados (según TZ local)
+            if slot.starts_at.astimezone(LOCAL_TZ) <= timezone.now().astimezone(LOCAL_TZ):
                 return _jerror("No puedes reservar un horario pasado.")
 
-            # armar kwargs, guardando phone solo si el modelo lo tiene
+            # 4) Datos del cliente según sesión
+            if user and user.is_authenticated:
+                profile = getattr(user, "profile", None)
+                customer_name = (
+                    (getattr(profile, "full_name", "") or "").strip()
+                    or f"{user.first_name} {user.last_name}".strip()
+                    or user.get_username()
+                )
+                customer_email = user.email
+                customer_phone = (getattr(profile, "phone", "") or "").strip()
+            else:
+                customer_name  = (payload.get("customer_name")  or "").strip()
+                customer_email = (payload.get("customer_email") or "").strip()
+                customer_phone = (payload.get("customer_phone") or "").strip()
+                if not customer_name or not customer_email:
+                    return _jerror("customer_name y customer_email son obligatorios")
+
+            # 5) Precio y abono (20 %)
+            service_price = int(slot.service.price or 0)
+            try:
+                deposit_amount = int(round(float(service_price) * 0.20))
+            except Exception:
+                deposit_amount = 0
+
             booking_kwargs = dict(
                 slot=slot,
-                customer=user,
+                customer=user if (user and user.is_authenticated) else None,
                 customer_name=customer_name,
                 customer_email=customer_email,
                 notes=notes,
-                status="pending",
+                status="pending",              # o "PENDING_PAYMENT"
+                service_price=service_price,   # snapshot
+                deposit_amount=deposit_amount,
+                paid_amount=0,
+                payment_status="PENDING",
             )
             if hasattr(Booking, "customer_phone"):
                 booking_kwargs["customer_phone"] = customer_phone
 
             booking = Booking.objects.create(**booking_kwargs)
 
+            # 6) Iniciar Webpay para el abono
+            buy_order = f"B{booking.id}"
+            session_id = str(user.id if (user and user.is_authenticated) else 0)
+            site_url = (getattr(settings, "SITE_URL", "") or "").rstrip("/")
+            return_url = f"{site_url}/api/bookings/commit/"
+
+            try:
+                tx_resp = create_tx(
+                    buy_order=buy_order,
+                    session_id=session_id,
+                    amount=deposit_amount,
+                    return_url=return_url,
+                )
+                token = tx_resp.get("token")
+                url = tx_resp.get("url")
+                if token:
+                    booking.payment_token = token
+                    booking.save(update_fields=["payment_token"])
+                redirect_url = f"{url}?token_ws={token}" if (token and url) else None
+            except Exception as e:
+                booking.delete()
+                return _jerror(f"No se pudo iniciar el pago: {str(e)}", status=500)
+
     except AvailabilitySlot.DoesNotExist:
         return _jerror("El slot no existe o no está activo.", status=404)
 
-    # 4) Respuesta útil para el front
-    return JsonResponse({
-        "booking_id": booking.id,
-        "slot_id": slot.id,
-        "service_id": slot.service_id,
-        "service_name": slot.service.name,
-        "starts_at": slot.starts_at.astimezone(LOCAL_TZ).isoformat(),
-        "ends_at":   slot.ends_at.astimezone(LOCAL_TZ).isoformat(),
-        "status": booking.status,
-    }, status=201)
+    # 7) Respuesta (con fallback de ends_at)
+    ends = getattr(slot, "ends_at", None)
+    if ends is None:
+        from datetime import timedelta
+        minutes = getattr(slot.service, "duration_minutes", 60) or 60
+        ends = slot.starts_at + timedelta(minutes=minutes)
+
+    return JsonResponse(
+        {
+            "booking_id": booking.id,
+            "slot_id": slot.id,
+            "service_id": slot.service_id,
+            "service_name": slot.service.name,
+            "starts_at": slot.starts_at.astimezone(LOCAL_TZ).isoformat(),
+            "ends_at": ends.astimezone(LOCAL_TZ).isoformat(),
+            "status": booking.status,
+            "redirect_url": redirect_url,
+        },
+        status=201,
+    )
+
+
+@csrf_exempt
+def booking_commit(request):
+    """
+    GET/POST /api/bookings/commit/?token_ws=...
+    Confirma la transacción Webpay, marca booking, envía correos y redirige al FE.
+    """
+    token = request.GET.get("token_ws") or request.POST.get("token_ws")
+    if not token:
+        return _jerror("token_ws faltante", status=400)
+
+    try:
+        resp = commit_tx(token)  # tu helper de SE_payments.webpay_service
+    except Exception as e:
+        return _jerror(f"Error al confirmar pago: {e}", status=500)
+
+    try:
+        booking = Booking.objects.select_related("slot__service").get(payment_token=token)
+    except Booking.DoesNotExist:
+        return _jerror("Reserva no encontrada para token.", status=404)
+
+    ok = str(resp.get("response_code")) == "0"
+
+    if ok:
+        booking.payment_status = "AUTHORIZED"
+        booking.paid_amount = resp.get("amount", booking.deposit_amount)
+        booking.status = "confirmed"
+        booking.save(update_fields=["payment_status", "paid_amount", "status"])
+
+        # marca el slot como tomado
+        if not hasattr(booking.slot, "booking"):
+            # Si tu modelo crea relación inversa automáticamente, omite esto
+            pass
+
+        # correos + calendar
+        try:
+            send_booking_emails(booking)
+        except Exception as e:
+            # registra/log si quieres
+            pass
+        try:
+            insert_business_event(booking)  # si lo habilitaste
+        except Exception:
+            pass
+    else:
+        booking.payment_status = "FAILED"
+        booking.status = "canceled"
+        booking.save(update_fields=["payment_status", "status"])
+
+    # Redirigir al FE con info para renderizar.
+    FRONTEND_URL = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    starts_local = booking.slot.starts_at.astimezone(LOCAL_TZ).strftime("%Y-%m-%dT%H:%M")
+    service_name = booking.slot.service.name
+
+    return redirect(
+        f"{FRONTEND_URL}/services/booking-success"
+        f"?ok={str(ok).lower()}&booking_id={booking.id}"
+        f"&service={service_name}&starts_at={starts_local}"
+        f"&amount={booking.deposit_amount}"
+    )
+
