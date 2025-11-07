@@ -82,7 +82,7 @@ export default function Contact() {
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Email</h3>
             <p className="text-gray-600 mb-3">Escríbenos en cualquier momento</p>
-            <a href="mailto:info@bellavita.com" className="text-pink-600 hover:text-pink-700 font-semibold">
+            <a href="mailto:stephanosestetic@gmail.com" className="text-pink-600 hover:text-pink-700 font-semibold">
               stephanosestetic@gmail.com
             </a>
           </div>
@@ -93,7 +93,7 @@ export default function Contact() {
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Llámanos</h3>
             <p className="text-gray-600 mb-3">Lun-Vie, 9AM-6PM</p>
-            <a href="tel:+15551234567" className="text-pink-600 hover:text-pink-700 font-semibold">
+            <a href="tel:+56 9 7344 5731" className="text-pink-600 hover:text-pink-700 font-semibold">
               +56 9 7344 5731
             </a>
           </div>

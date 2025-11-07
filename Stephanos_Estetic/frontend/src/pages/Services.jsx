@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-// Import additional icons for category filtering similar to the Products page.
-// We choose common icons from lucide-react to visually differentiate each service group.
 import {
   Clock,
   DollarSign,
@@ -24,10 +22,10 @@ const serviceImages = import.meta.glob(
 
 // util: genera slug consistente a partir del nombre si no tienes service.slug
 function toSlug(text = "") {
-  return text
+  return String(text)
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // quita tildes
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
@@ -53,18 +51,24 @@ function getServiceImage(service) {
   for (const p of candidates) {
     if (serviceImages[p]) return serviceImages[p];
   }
-  return null; // fuerza el fallback a emoji
+  return null; // fallback a emoji
 }
 
 export default function Services() {
   const [services, setServices] = useState([]);
-  // We maintain a filtered list and selected category similar to Products.jsx.
   const [filteredServices, setFilteredServices] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [schedules, setSchedules] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+
   const [loading, setLoading] = useState(true);
+
+  // >>> estados de usuario que faltaban antes
+  const [userLoading, setUserLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userError, setUserError] = useState(null);
+
   const [bookingForm, setBookingForm] = useState({
     customer_name: "",
     customer_email: "",
@@ -74,15 +78,6 @@ export default function Services() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  /**
-   * The categories available for filtering services.  These correspond to the
-   * service groupings defined in the Word document (Limpiezas faciales,
-   * Masajes corporales, Depilación corporal, Manicure/Pedicure, Tratamientos
-   * para cejas/pestañas y micropigmentaciones).  Each category has an id,
-   * a display label and an icon.  The id is used internally and should be
-   * matched against the result of `guessServiceCategory(name)` when
-   * filtering.
-   */
   const categories = [
     { id: "all", label: "Todos los Servicios", icon: Package },
     { id: "limpiezas", label: "Limpiezas Faciales", icon: Sparkles },
@@ -95,14 +90,9 @@ export default function Services() {
 
   useEffect(() => {
     fetchServices();
-    // cargar perfil del usuario para autocompletar, si está logueado
-    fetchMe();
+    fetchMe(); // cargar perfil del usuario si hay sesión
   }, []);
 
-  // Whenever the list of services or the selected category changes, update the
-  // filtered list.  If the 'all' category is selected, all services are
-  // displayed.  Otherwise services are filtered using a heuristic that
-  // classifies the service by its name.  See guessServiceCategory() below.
   useEffect(() => {
     if (selectedCategory === "all") {
       setFilteredServices(services);
@@ -117,12 +107,12 @@ export default function Services() {
 
   useEffect(() => {
     if (selectedService) {
-      fetchSchedules(selectedService.id); // puede ser numérico o "svcX", el backend acepta ambos
+      fetchSchedules(selectedService.id);
     }
   }, [selectedService]);
 
   const fetchJSON = async (url) => {
-    const res = await fetch(url);
+    const res = await fetch(url, { credentials: "include" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   };
@@ -130,9 +120,15 @@ export default function Services() {
   // Obtiene el usuario autenticado (si existe)
   const fetchMe = async () => {
     setUserLoading(true);
+    setUserError(null);
     try {
-      const res = await fetch("/api/user/me/", { credentials: "include" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // OJO: en tu proyecto las rutas de usuarios cuelgan de /api/users/...
+      const res = await fetch("/api/users/me/", { credentials: "include" });
+      if (!res.ok) {
+        // 401/403 se manejan como "no logueado"
+        setCurrentUser(null);
+        return;
+      }
       const data = await res.json();
       if (data?.is_authenticated) {
         setCurrentUser({
@@ -145,6 +141,8 @@ export default function Services() {
         setCurrentUser(null);
       }
     } catch (e) {
+      console.error("fetchMe error:", e);
+      setUserError("No fue posible cargar tu sesión.");
       setCurrentUser(null);
     } finally {
       setUserLoading(false);
@@ -163,8 +161,7 @@ export default function Services() {
           id: "svc1",
           type: "beauty",
           name: "Limpieza facial profunda",
-          description:
-            "Renueva y oxigena tu piel con una limpieza profesional.",
+          description: "Renueva y oxigena tu piel con una limpieza profesional.",
           duration_minutes: 60,
           price: 24990,
           active: true,
@@ -200,7 +197,6 @@ export default function Services() {
 
       const data = await fetchJSON(url);
 
-      // Soporta array plano o { items: [...] }
       const raw = Array.isArray(data) ? data : data?.items ?? [];
 
       // Normaliza a { id, service_id, date, start_time, is_booked }
@@ -267,7 +263,6 @@ export default function Services() {
     // Arma el payload según el usuario autenticado
     let booking;
     if (currentUser) {
-      // solo enviamos notas y el slot; el backend llenará datos desde sesión
       booking = {
         service_schedule_id: selectedSchedule.id,
         notes: bookingForm.notes,
@@ -299,13 +294,12 @@ export default function Services() {
         throw new Error(msg || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      // Si el backend devuelve una URL para Webpay, redirigimos al pago
+
       if (data?.redirect_url) {
         window.location.href = data.redirect_url;
         return;
       }
 
-      // fallback: mostrar éxito localmente
       setShowSuccess(true);
       setBookingForm({
         customer_name: "",
@@ -347,6 +341,15 @@ export default function Services() {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  const formatCLP = (v) =>
+    typeof v === "number"
+      ? new Intl.NumberFormat("es-CL", {
+          style: "currency",
+          currency: "CLP",
+          maximumFractionDigits: 0,
+        }).format(v)
+      : v;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -367,12 +370,11 @@ export default function Services() {
             </span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Reserva tu sesión de belleza personalizada con nuestro
-            equipo de expertos
+            Reserva tu sesión de belleza personalizada con nuestro equipo de expertos
           </p>
         </div>
 
-        {/* Filtros de categorías, similar a Products.jsx */}
+        {/* Filtros de categorías */}
         {!selectedService && (
           <div className="mb-10">
             <div className="flex flex-wrap justify-center gap-3">
@@ -406,7 +408,7 @@ export default function Services() {
                 className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:-translate-y-1 cursor-pointer"
                 onClick={() => setSelectedService(service)}
               >
-                {/* IMAGEN en vez de emoji */}
+                {/* Imagen */}
                 <div className="h-48 bg-gray-50 flex items-center justify-center relative">
                   {getServiceImage(service) ? (
                     <img
@@ -425,7 +427,6 @@ export default function Services() {
 
                 <div className="p-6">
                   <div className="inline-block px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-semibold mb-3 uppercase">
-                    {/* Muestra el nombre de la categoría deducida si existe o el tipo original */}
                     {(() => {
                       const catId = guessServiceCategory(service?.name);
                       const found = categories.find((c) => c.id === catId);
@@ -446,9 +447,11 @@ export default function Services() {
                     <div className="flex items-center text-pink-600 font-semibold">
                       <DollarSign className="h-4 w-4" />
                       <span>
-                        {typeof service?.price === "number"
-                          ? `${service.price}`
-                          : service?.price}
+                        {formatCLP(
+                          typeof service?.price === "number"
+                            ? service.price
+                            : Number(service?.price) || service?.price
+                        )}
                       </span>
                     </div>
                   </div>
@@ -481,7 +484,6 @@ export default function Services() {
                   <p className="text-gray-600">{selectedService.description}</p>
                 </div>
 
-                {/* Miniatura en el detalle con fallback a emoji */}
                 <div className="w-40 h-28 relative rounded-xl overflow-hidden bg-gray-50 shrink-0 flex items-center justify-center">
                   {getServiceImage(selectedService) ? (
                     <img
@@ -499,9 +501,11 @@ export default function Services() {
 
                 <div className="text-right">
                   <div className="text-3xl font-bold text-pink-600">
-                    {typeof selectedService.price === "number"
-                      ? `$${selectedService.price}`
-                      : selectedService.price}
+                    {formatCLP(
+                      typeof selectedService.price === "number"
+                        ? selectedService.price
+                        : Number(selectedService.price) || selectedService.price
+                    )}
                   </div>
                   <div className="text-sm text-gray-500">
                     {selectedService.duration_minutes} minutos
@@ -565,9 +569,7 @@ export default function Services() {
                 </div>
 
                 <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-gray-600 mb-1">
-                    Hora Seleccionada:
-                  </p>
+                  <p className="text-sm text-gray-600 mb-1">Hora Seleccionada:</p>
                   <p className="text-lg font-semibold text-gray-900">
                     {formatDate(selectedSchedule.date)} a las{" "}
                     {formatTime(selectedSchedule.start_time)}
@@ -581,8 +583,7 @@ export default function Services() {
                       ¡Reserva Confirmada!
                     </h4>
                     <p className="text-green-700">
-                      Te enviaremos un correo electrónico de confirmación en
-                      breve.
+                      Te enviaremos un correo electrónico de confirmación en breve.
                     </p>
                   </div>
                 ) : (
@@ -590,6 +591,12 @@ export default function Services() {
                     {error && (
                       <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
                         {error}
+                      </div>
+                    )}
+
+                    {userError && (
+                      <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-3 text-sm">
+                        {userError}
                       </div>
                     )}
 
@@ -686,6 +693,7 @@ export default function Services() {
                                 customer_phone: e.target.value,
                               })
                             }
+                            placeholder="+56912345678"
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
                           />
                         </div>
@@ -714,7 +722,7 @@ export default function Services() {
                       disabled={userLoading}
                       className="w-full px-6 py-4 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      Confirmar Reserva
+                      {userLoading ? "Procesando..." : "Confirmar Reserva"}
                     </button>
                   </form>
                 )}
@@ -740,22 +748,9 @@ function groupByDate(list = []) {
     .map((date) => ({ date, slots: acc[date] }));
 }
 
-/**
- * Attempt to infer a high-level service category from a given service name.
- * This helper examines common keywords present in the names of the services
- * described in the specification Word document.  The returned value should
- * match one of the ids defined in the `categories` array.  If no keyword
- * matches, the default category "otros" will be returned.  Update this
- * function whenever new services are added to ensure they appear under the
- * appropriate filter.
- */
 function guessServiceCategory(name = "") {
   const n = String(name).toLowerCase();
-  if (
-    n.includes("limpieza") ||
-    n.includes("peeling") ||
-    n.includes("facial")
-  )
+  if (n.includes("limpieza") || n.includes("peeling") || n.includes("facial"))
     return "limpiezas";
   if (
     n.includes("masaje") ||
@@ -776,18 +771,9 @@ function guessServiceCategory(name = "") {
     n.includes("acrilica")
   )
     return "manicure";
-  if (
-    n.includes("ceja") ||
-    n.includes("pestaña") ||
-    n.includes("henna") ||
-    n.includes("barba")
-  )
+  if (n.includes("ceja") || n.includes("pestaña") || n.includes("henna") || n.includes("barba"))
     return "cejas";
-  if (
-    n.includes("micro") ||
-    n.includes("camuflaje") ||
-    n.includes("reconstru")
-  )
+  if (n.includes("micro") || n.includes("camuflaje") || n.includes("reconstru"))
     return "micropigmentacion";
   return "otros";
 }
