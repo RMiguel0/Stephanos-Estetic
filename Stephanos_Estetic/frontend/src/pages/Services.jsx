@@ -74,7 +74,6 @@ export default function Services() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
 
-<<<<<<< HEAD
   /**
    * The categories available for filtering services.  These correspond to the
    * service groupings defined in the Word document (Limpiezas faciales,
@@ -93,11 +92,6 @@ export default function Services() {
     { id: "cejas", label: "Cejas y Pestañas", icon: Eye },
     { id: "micropigmentacion", label: "Micropigmentación", icon: PenTool },
   ];
-=======
-  // Estado del usuario actual (para autocompletar datos). currentUser null si no autenticado.
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userLoading, setUserLoading] = useState(true);
->>>>>>> 4f134b6f0d7423a6f6b05789494ded42fbd20012
 
   useEffect(() => {
     fetchServices();
