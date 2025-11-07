@@ -1,4 +1,4 @@
-import { Heart, Sparkles, Users, Award } from "lucide-react";
+import { Heart, Sparkles, Users, Award, CrownIcon } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import logo from "../assets/logo_SE.svg";
 
@@ -7,27 +7,27 @@ export default function Home() {
   const features = [
     {
       icon: Heart,
-      title: "Personalized Care",
+      title: "¿Quiénes Somos?",
       description:
-        "Tailored beauty and coaching services designed specifically for your unique needs and goals.",
+        "Somos personas que, al igual que muchos, hemos enfrentado enfermedades que transforman cuerpo y espíritu. En Dios Todopoderoso encontramos la fortaleza, la paz y la esperanza para seguir adelante, cuidando la vida como un regalo sagrado.",
     },
     {
       icon: Sparkles,
-      title: "Premium Products",
+      title: "Nuestra Misión",
       description:
-        "Curated selection of high-quality beauty products, clothing, and personalized items.",
+        "Servir con amor y excelencia a través de la estética integral y oncológica. Queremos que cada persona descubra en su reflejo no solo belleza exterior, sino también la victoria interior que proviene de la fe y la esperanza.",
     },
     {
       icon: Users,
-      title: "Expert Team",
+      title: "¿Por Qué Elegirnos?",
       description:
-        "Professional coaches and beauty specialists dedicated to your transformation journey.",
+        "Porque unimos ciencia, empatía y fe. Nuestros tratamientos son seguros, personalizados y humanizados, diseñados para acompañarte en cuerpo, mente y espíritu, recordándote que eres obra perfecta de Dios.",
     },
     {
-      icon: Award,
-      title: "Proven Results",
+      icon: CrownIcon,
+      title: "El Significado de Stephanos",
       description:
-        "Join hundreds of satisfied clients who have achieved their wellness and beauty goals.",
+        "‘Stephanos’ en griego significa corona de victoria. Representa las recompensas espirituales que Dios promete a quienes perseveran con fe, amor y buen testimonio. Cada servicio busca reflejar esa victoria en tu piel, tu ánimo y tu corazón.",
     },
   ];
 
@@ -81,11 +81,14 @@ export default function Home() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
           <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            ¿Por qué elegirnos?
+            Sobre{" "}
+            <span className="bg-gradient-to-r from-pink-500 to-pink-600 bg-clip-text text-transparent"> 
+              Nosotros
+            </span>
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Nosotros combinamos experiencia, pasión y dedicación para ofrecer
-            experiencias excepcionales.
+            Combinamos experiencia, pasión y dedicación para ofrecer
+            vivencias excepcionales.
           </p>
         </div>
 

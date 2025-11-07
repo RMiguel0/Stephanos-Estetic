@@ -1,5 +1,20 @@
 import { useState, useEffect } from "react";
-import { Clock, DollarSign, Calendar, Check, X } from "lucide-react";
+// Import additional icons for category filtering similar to the Products page.
+// We choose common icons from lucide-react to visually differentiate each service group.
+import {
+  Clock,
+  DollarSign,
+  Calendar,
+  Check,
+  X,
+  Sparkles,
+  Users,
+  Scissors,
+  Eye,
+  PenTool,
+  Package,
+  Award,
+} from "lucide-react";
 
 // importa todas las imágenes de la carpeta como URLs procesadas por Vite
 const serviceImages = import.meta.glob(
@@ -43,6 +58,9 @@ function getServiceImage(service) {
 
 export default function Services() {
   const [services, setServices] = useState([]);
+  // We maintain a filtered list and selected category similar to Products.jsx.
+  const [filteredServices, setFilteredServices] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [schedules, setSchedules] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
@@ -56,9 +74,44 @@ export default function Services() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
 
+  /**
+   * The categories available for filtering services.  These correspond to the
+   * service groupings defined in the Word document (Limpiezas faciales,
+   * Masajes corporales, Depilación corporal, Manicure/Pedicure, Tratamientos
+   * para cejas/pestañas y micropigmentaciones).  Each category has an id,
+   * a display label and an icon.  The id is used internally and should be
+   * matched against the result of `guessServiceCategory(name)` when
+   * filtering.
+   */
+  const categories = [
+    { id: "all", label: "Todos los Servicios", icon: Package },
+    { id: "limpiezas", label: "Limpiezas Faciales", icon: Sparkles },
+    { id: "masajes", label: "Masajes Corporales", icon: Users },
+    { id: "depilacion", label: "Depilación", icon: Scissors },
+    { id: "manicure", label: "Manicure y Pedicure", icon: Award },
+    { id: "cejas", label: "Cejas y Pestañas", icon: Eye },
+    { id: "micropigmentacion", label: "Micropigmentación", icon: PenTool },
+  ];
+
   useEffect(() => {
     fetchServices();
   }, []);
+
+  // Whenever the list of services or the selected category changes, update the
+  // filtered list.  If the 'all' category is selected, all services are
+  // displayed.  Otherwise services are filtered using a heuristic that
+  // classifies the service by its name.  See guessServiceCategory() below.
+  useEffect(() => {
+    if (selectedCategory === "all") {
+      setFilteredServices(services);
+    } else {
+      setFilteredServices(
+        services.filter(
+          (svc) => guessServiceCategory(svc?.name) === selectedCategory
+        )
+      );
+    }
+  }, [selectedCategory, services]);
 
   useEffect(() => {
     if (selectedService) {
@@ -88,15 +141,6 @@ export default function Services() {
             "Renueva y oxigena tu piel con una limpieza profesional.",
           duration_minutes: 60,
           price: 24990,
-          active: true,
-        },
-        {
-          id: "svc2",
-          type: "coaching",
-          name: "Masoterapia descontracturante",
-          description: "Alivia tensiones y mejora tu descanso.",
-          duration_minutes: 50,
-          price: 22990,
           active: true,
         },
         {
@@ -280,15 +324,40 @@ export default function Services() {
             </span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Reserva tu sesión de coaching o belleza personalizada con nuestro
+            Reserva tu sesión de belleza personalizada con nuestro
             equipo de expertos
           </p>
         </div>
 
+        {/* Filtros de categorías, similar a Products.jsx */}
+        {!selectedService && (
+          <div className="mb-10">
+            <div className="flex flex-wrap justify-center gap-3">
+              {categories.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all ${
+                      selectedCategory === category.id
+                        ? "bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg scale-105"
+                        : "bg-white text-gray-700 border-2 border-gray-200 hover:border-pink-300 hover:bg-pink-50"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{category.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Listado de servicios */}
         {!selectedService ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {services.map((service) => (
+            {filteredServices.map((service) => (
               <div
                 key={service.id}
                 className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:-translate-y-1 cursor-pointer"
@@ -313,7 +382,12 @@ export default function Services() {
 
                 <div className="p-6">
                   <div className="inline-block px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-semibold mb-3 uppercase">
-                    {service?.type || "servicio"}
+                    {/* Muestra el nombre de la categoría deducida si existe o el tipo original */}
+                    {(() => {
+                      const catId = guessServiceCategory(service?.name);
+                      const found = categories.find((c) => c.id === catId);
+                      return found ? found.label : service?.type || "servicio";
+                    })()}
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
                     {service?.name}
@@ -574,4 +648,56 @@ function groupByDate(list = []) {
   return Object.keys(acc)
     .sort()
     .map((date) => ({ date, slots: acc[date] }));
+}
+
+/**
+ * Attempt to infer a high-level service category from a given service name.
+ * This helper examines common keywords present in the names of the services
+ * described in the specification Word document.  The returned value should
+ * match one of the ids defined in the `categories` array.  If no keyword
+ * matches, the default category "otros" will be returned.  Update this
+ * function whenever new services are added to ensure they appear under the
+ * appropriate filter.
+ */
+function guessServiceCategory(name = "") {
+  const n = String(name).toLowerCase();
+  if (
+    n.includes("limpieza") ||
+    n.includes("peeling") ||
+    n.includes("facial")
+  )
+    return "limpiezas";
+  if (
+    n.includes("masaje") ||
+    n.includes("drenaje") ||
+    n.includes("glúteo") ||
+    n.includes("gluteo") ||
+    n.includes("glúteos") ||
+    n.includes("senos")
+  )
+    return "masajes";
+  if (n.includes("depil")) return "depilacion";
+  if (
+    n.includes("uña") ||
+    n.includes("manicure") ||
+    n.includes("pedicure") ||
+    n.includes("polygel") ||
+    n.includes("acrílica") ||
+    n.includes("acrilica")
+  )
+    return "manicure";
+  if (
+    n.includes("ceja") ||
+    n.includes("pestaña") ||
+    n.includes("henna") ||
+    n.includes("barba")
+  )
+    return "cejas";
+  if (
+    n.includes("micro") ||
+    n.includes("camuflaje") ||
+    n.includes("reconstru")
+  )
+    return "micropigmentacion";
+  return "otros";
 }
