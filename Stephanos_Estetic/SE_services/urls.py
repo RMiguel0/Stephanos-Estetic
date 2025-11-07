@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import csrf_ok, services_list, service_schedules, create_booking
+from .views import csrf_ok, services_list, service_schedules, create_booking, booking_commit
 
 app_name = "services"
 
@@ -8,4 +8,6 @@ urlpatterns = [
     path("services/", services_list, name="services_list"),
     path("service_schedules/", service_schedules, name="service_schedules"),
     path("bookings/", create_booking, name="create_booking"),
+    # Endpoint de retorno para confirmar el abono de una reserva
+    path("bookings/commit/", booking_commit, name="booking_commit"),
 ]

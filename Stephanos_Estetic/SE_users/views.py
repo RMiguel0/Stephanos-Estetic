@@ -25,6 +25,8 @@ def current_user(request):
     if not u.is_authenticated:
         # Para SPA es más práctico responder 200 con flag
         return JsonResponse({"is_authenticated": False})
+    profile = getattr(u, "profile", None)
+    phone = profile.phone if profile else ""
     return JsonResponse({
         "id": u.id,
         "username": u.username,
@@ -32,6 +34,7 @@ def current_user(request):
         "first_name": u.first_name,
         "last_name": u.last_name,
         "full_name": f"{u.first_name} {u.last_name}".strip() or u.username,
+        "phone": phone,
         "is_authenticated": True,
     })
 

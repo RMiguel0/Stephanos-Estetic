@@ -57,7 +57,17 @@ class Order(models.Model):
         ]
 
     def recompute_total(self, save=True):
-        total = self.items.aggregate(s=Sum("line_total"))["s"] or 0
+        """
+        Recalcula el total de la orden sumando tanto los productos como los servicios
+        asociados. Si existen ServiceOrderItems relacionados (service_items),
+        también se incluyen en el total.
+        """
+        product_total = self.items.aggregate(s=Sum("line_total"))["s"] or 0
+        service_total = 0
+        # Incluir el total de servicios si la relación existe
+        if hasattr(self, "service_items"):
+            service_total = self.service_items.aggregate(s=Sum("line_total"))["s"] or 0
+        total = (product_total or 0) + (service_total or 0)
         self.total_amount = total
         if save:
             self.save(update_fields=["total_amount"])
@@ -116,6 +126,48 @@ class OrderItem(models.Model):
         super().save(*args, **kwargs)
         self.order.recompute_total()
         
+    def delete(self, *args, **kwargs):
+        order = self.order
+        super().delete(*args, **kwargs)
+        order.recompute_total()
+
+
+class ServiceOrderItem(models.Model):
+    """
+    Item de servicio vinculado a una Order, equivalente a OrderItem pero para servicios.
+    Permite registrar el servicio reservado (u ofrecido) dentro de una orden de venta,
+    conservando el precio y la cantidad al momento de la compra. No descuenta stock.
+    """
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="service_items")
+    service = models.ForeignKey("SE_services.Service", on_delete=models.PROTECT)
+    qty = models.PositiveIntegerField()
+    price_at = models.DecimalField(max_digits=10, decimal_places=2)  # snapshot del precio
+    line_total = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"Servicio({self.service.name}) x{self.qty} en Orden #{self.order_id}"
+
+    class Meta:
+        ordering = ["order_id", "id"]
+        constraints = [
+            models.CheckConstraint(check=models.Q(qty__gt=0), name="serviceorderitem_qty_gt_0"),
+            models.CheckConstraint(check=models.Q(price_at__gte=0), name="serviceorderitem_price_at_gte_0"),
+            models.CheckConstraint(check=models.Q(line_total__gte=0), name="serviceorderitem_line_total_gte_0"),
+        ]
+        indexes = [
+            models.Index(fields=["order"]),
+            models.Index(fields=["service"]),
+        ]
+
+    # --- Lógica de totales ---
+    def save(self, *args, **kwargs):
+        if self.price_at is None:
+            self.price_at = self.service.price
+        self.line_total = (self.qty or 0) * (self.price_at or 0)
+        super().save(*args, **kwargs)
+        # actualiza total de la orden
+        self.order.recompute_total()
+
     def delete(self, *args, **kwargs):
         order = self.order
         super().delete(*args, **kwargs)

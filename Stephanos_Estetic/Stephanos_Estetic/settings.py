@@ -223,9 +223,40 @@ WEBPAY_COMMERCE_CODE = os.getenv("WEBPAY_COMMERCE_CODE", "")
 WEBPAY_API_KEY = os.getenv("WEBPAY_API_KEY", "")
 WEBPAY_RETURN_URL = "http://localhost:8000/api/payments/commit"
 
+# -----------------------------------------------------------------------------
+# Configuración para reservas de servicios
+# -----------------------------------------------------------------------------
+# URL base del sitio (backend) utilizado al construir enlaces de retorno de Webpay.
+# Ajusta en producción según tu dominio real, ej. "https://api.tu-dominio.cl"
+SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
+
+# Correo donde la pyme recibirá las notificaciones de reservas. Debe definirse
+# como variable de entorno BOOKING_NOTIFY_EMAIL o en settings.
+BOOKINGS_NOTIFY_EMAIL = os.getenv("BOOKINGS_NOTIFY_EMAIL", "stephanosestetic@gmail.com")
+
+# Ubicación utilizada en los archivos .ics (se mostrará en los calendarios)
+BOOKING_LOCATION = os.getenv("BOOKING_LOCATION", "Stephanos Estetic - Santiago")
+
+# Configuración para Google Calendar (service account). Para activar el envío de
+# eventos automáticos al calendario de la empresa, establece GOOGLE_CALENDAR_SERVICE_ENABLED
+# en True y define GOOGLE_CALENDAR_CALENDAR_ID y GOOGLE_CREDENTIALS_FILE.
+GOOGLE_CALENDAR_SERVICE_ENABLED = os.getenv("GOOGLE_CALENDAR_SERVICE_ENABLED", "False") == "True"
+GOOGLE_CALENDAR_CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_CALENDAR_ID", "")
+GOOGLE_CREDENTIALS_FILE = os.getenv("GOOGLE_CREDENTIALS_FILE", "")
+
 # Google OAuth (alias por compatibilidad si en algún punto lees GOOGLE_OAUTH_CLIENT_ID)
 GOOGLE_CLIENT_ID = (
     os.getenv("GOOGLE_OAUTH_CLIENT_ID")
     or os.getenv("GOOGLE_CLIENT_ID")
     or ""
 )
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "stephanosestetic@gmail.com")  # tu correo
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")  # app password
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+EMAIL_TIMEOUT = 30
+
