@@ -78,6 +78,9 @@ export default function Services() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
 
+  // NUEVO: aceptación de abono 20%
+  const [acceptDeposit, setAcceptDeposit] = useState(false);
+
   const categories = [
     { id: "all", label: "Todos los Servicios", icon: Package },
     { id: "limpiezas", label: "Limpiezas Faciales", icon: Sparkles },
@@ -110,6 +113,11 @@ export default function Services() {
       fetchSchedules(selectedService.id);
     }
   }, [selectedService]);
+
+  // NUEVO: resetear aceptación cuando cambia horario o servicio
+  useEffect(() => {
+    setAcceptDeposit(false);
+  }, [selectedSchedule, selectedService]);
 
   const fetchJSON = async (url) => {
     const res = await fetch(url, { credentials: "include" });
@@ -350,6 +358,13 @@ export default function Services() {
         }).format(v)
       : v;
 
+  // Precio del servicio seleccionado y abono calculado (20%)
+  const selectedServicePrice =
+    typeof selectedService?.price === "number"
+      ? selectedService.price
+      : Number(selectedService?.price) || 0;
+  const deposit = Math.round(selectedServicePrice * 0.2);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -469,6 +484,7 @@ export default function Services() {
               onClick={() => {
                 setSelectedService(null);
                 setSelectedSchedule(null);
+                setAcceptDeposit(false); // reset explícito al volver
               }}
               className="mb-6 text-pink-600 hover:text-pink-700 font-semibold flex items-center"
             >
@@ -576,6 +592,17 @@ export default function Services() {
                   </p>
                 </div>
 
+                {/* NUEVO: Aviso y aceptación del abono */}
+                <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-yellow-900">
+                    <b>Importante:</b> para asegurar tu reserva se cobrará un{" "}
+                    <b>abono del 20%</b> del valor del servicio.
+                  </p>
+                  <p className="text-sm text-yellow-900 mt-1">
+                    Monto del abono: <b>{formatCLP(deposit)}</b>
+                  </p>
+                </div>
+
                 {showSuccess ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
                     <Check className="h-12 w-12 text-green-600 mx-auto mb-3" />
@@ -599,6 +626,20 @@ export default function Services() {
                         {userError}
                       </div>
                     )}
+
+                    {/* Checkbox de aceptación del abono */}
+                    <label className="flex items-start gap-2 mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4"
+                        checked={acceptDeposit}
+                        onChange={(e) => setAcceptDeposit(e.target.checked)}
+                        required
+                      />
+                      <span className="text-sm text-gray-700">
+                        Acepto el cobro del <b>20%</b> del valor del servicio como abono para confirmar mi reserva.
+                      </span>
+                    </label>
 
                     {currentUser ? (
                       <>
@@ -719,10 +760,12 @@ export default function Services() {
 
                     <button
                       type="submit"
-                      disabled={userLoading}
+                      disabled={userLoading || !acceptDeposit}
                       className="w-full px-6 py-4 bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      {userLoading ? "Procesando..." : "Confirmar Reserva"}
+                      {userLoading
+                        ? "Procesando..."
+                        : `Confirmar y pagar abono (${formatCLP(deposit)})`}
                     </button>
                   </form>
                 )}

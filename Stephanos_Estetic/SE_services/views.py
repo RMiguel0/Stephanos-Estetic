@@ -125,7 +125,7 @@ def service_schedules(request):
 
     items = []
     for slot in qs:
-        booked = hasattr(slot, "booking")
+        booked = hasattr(slot, "booking") and getattr(slot.booking, "status", "") not in ("cancelled",)
         if is_booked != booked:
             continue
         items.append({
@@ -284,60 +284,121 @@ def create_booking(request):
 @csrf_exempt
 def booking_commit(request):
     """
-    GET/POST /api/bookings/commit/?token_ws=...
-    Confirma la transacción Webpay, marca booking, envía correos y redirige al FE.
+    Endpoint de retorno de Webpay (éxito / anulación / fallo).
+    - Éxito: llega con token_ws (commit)
+    - Anulación: llega con TBK_TOKEN y TBK_ORDEN_COMPRA (NO hay token_ws)
     """
-    token = request.GET.get("token_ws") or request.POST.get("token_ws")
-    if not token:
-        return _jerror("token_ws faltante", status=400)
-
-    try:
-        resp = commit_tx(token)  # tu helper de SE_payments.webpay_service
-    except Exception as e:
-        return _jerror(f"Error al confirmar pago: {e}", status=500)
-
-    try:
-        booking = Booking.objects.select_related("slot__service").get(payment_token=token)
-    except Booking.DoesNotExist:
-        return _jerror("Reserva no encontrada para token.", status=404)
-
-    ok = str(resp.get("response_code")) == "0"
-
-    if ok:
-        booking.payment_status = "AUTHORIZED"
-        booking.paid_amount = resp.get("amount", booking.deposit_amount)
-        booking.status = "confirmed"
-        booking.save(update_fields=["payment_status", "paid_amount", "status"])
-
-        # marca el slot como tomado
-        if not hasattr(booking.slot, "booking"):
-            # Si tu modelo crea relación inversa automáticamente, omite esto
-            pass
-
-        # correos + calendar
-        try:
-            send_booking_emails(booking)
-        except Exception as e:
-            # registra/log si quieres
-            pass
-        try:
-            insert_business_event(booking)  # si lo habilitaste
-        except Exception:
-            pass
-    else:
-        booking.payment_status = "FAILED"
-        booking.status = "canceled"
-        booking.save(update_fields=["payment_status", "status"])
-
-    # Redirigir al FE con info para renderizar.
     FRONTEND_URL = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
-    starts_local = booking.slot.starts_at.astimezone(LOCAL_TZ).strftime("%Y-%m-%dT%H:%M")
-    service_name = booking.slot.service.name
 
-    return redirect(
-        f"{FRONTEND_URL}/services/booking-success"
-        f"?ok={str(ok).lower()}&booking_id={booking.id}"
-        f"&service={service_name}&starts_at={starts_local}"
-        f"&amount={booking.deposit_amount}"
-    )
+    token_ws = request.GET.get("token_ws") or request.POST.get("token_ws")
+    tbk_token = request.GET.get("TBK_TOKEN") or request.POST.get("TBK_TOKEN")
+    tbk_order = request.GET.get("TBK_ORDEN_COMPRA") or request.POST.get("TBK_ORDEN_COMPRA")
+    tbk_session = request.GET.get("TBK_ID_SESION") or request.POST.get("TBK_ID_SESION")
+
+    def _redirect(booking, ok: bool):
+        # Si el booking fue borrado para liberar el slot, reconstruimos datos mínimos
+        if booking and booking.slot_id:
+            starts_local = booking.slot.starts_at.astimezone(LOCAL_TZ).strftime("%Y-%m-%dT%H:%M")
+            service_name = booking.slot.service.name
+            amount = booking.deposit_amount
+            bid = booking.id
+        else:
+            # fallback seguro
+            starts_local = ""
+            service_name = ""
+            amount = 0
+            bid = booking.id if booking else 0
+
+        return redirect(
+            f"{FRONTEND_URL}/services/booking-success"
+            f"?ok={str(ok).lower()}&booking_id={bid}"
+            f"&service={service_name}&starts_at={starts_local}"
+            f"&amount={amount}"
+        )
+
+    # === CASO 1: ÉXITO/FAIL normal (regresa con token_ws) ===
+    if token_ws:
+        try:
+            resp = commit_tx(token_ws)
+        except Exception as e:
+            return _jerror(f"Error al confirmar pago: {e}", status=500)
+
+        try:
+            booking = Booking.objects.select_related("slot__service").get(payment_token=token_ws)
+        except Booking.DoesNotExist:
+            return _jerror("Reserva no encontrada para token.", status=404)
+
+        response_code = str(resp.get("response_code"))
+        ok = response_code == "0"
+
+        if ok:
+            booking.payment_status = "AUTHORIZED"
+            booking.paid_amount = resp.get("amount", booking.deposit_amount)
+            booking.status = "paid"
+            booking.save(update_fields=["payment_status", "paid_amount", "status"])
+            try:
+                send_booking_emails(booking)
+            except Exception:
+                pass
+            try:
+                insert_business_event(booking)
+            except Exception:
+                pass
+            return _redirect(booking, ok=True)
+        else:
+            # Pago rechazado en commit => liberar el horario
+            booking.payment_status = "FAILED"
+            booking.status = "cancelled"
+            booking.save(update_fields=["payment_status", "status"])
+            # Elimina el booking para liberar el OneToOne del slot
+            bid = booking.id
+            booking.delete()
+            # Creamos un dummy para pasar datos al redirect (opcional)
+            class _B: pass
+            b = _B()
+            b.id = bid
+            b.slot_id = None
+            b.deposit_amount = 0
+            return _redirect(b, ok=False)
+
+    # === CASO 2: ANULACIÓN/ABORTO (regresa sin token_ws, con TBK_* ) ===
+    # Aquí NUNCA se hace commit. Debemos cancelar y liberar el slot usando la orden de compra.
+    if tbk_order:
+        # Nosotros construimos buy_order como "B<booking_id>", ej: "B7"
+        try:
+            # TBK_ORDEN_COMPRA podría venir exactamente igual a nuestro buy_order
+            # Si tu create_tx usa "B{booking.id}" esto funcionará:
+            if tbk_order.startswith("B"):
+                booking_id = int(tbk_order[1:])
+                try:
+                    booking = Booking.objects.select_related("slot__service").get(id=booking_id)
+                except Booking.DoesNotExist:
+                    booking = None
+            else:
+                booking = None
+        except Exception:
+            booking = None
+    else:
+        booking = None
+
+    # Si no logramos encontrar por orden, intentamos por TBK_TOKEN (a veces coincide con payment_token)
+    if not (booking or None) and tbk_token:
+        booking = Booking.objects.select_related("slot__service").filter(payment_token=tbk_token).first()
+
+    # Si encontramos la reserva, la marcamos cancelada y la eliminamos para liberar el slot
+    if booking:
+        booking.payment_status = "FAILED"
+        booking.status = "cancelled"
+        booking.save(update_fields=["payment_status", "status"])
+        bid = booking.id
+        booking.delete()
+        class _B: pass
+        b = _B()
+        b.id = bid
+        b.slot_id = None
+        b.deposit_amount = 0
+        return _redirect(b, ok=False)
+
+    # Si no encontramos nada, igual redirigimos como cancelado
+    return redirect(f"{FRONTEND_URL}/services/booking-success?ok=false")
 
