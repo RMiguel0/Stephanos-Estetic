@@ -95,12 +95,14 @@ def _fmt_local(dt):
 
 def send_booking_emails(booking: Booking):
     """
-    Envía correo de confirmación al cliente y notifica a la pyme. Adjunta .ics.
+    Envía un correo de confirmación con los detalles de la reserva al cliente y
+    envía una copia con la misma información al correo de la pyme (Stephanos).
+    Se adjunta un archivo .ics para que ambos puedan añadir el evento a su calendario.
     """
     if not booking or not booking.customer_email:
         return
 
-    # Correo al cliente
+    # Mensaje de confirmación para el cliente
     subject_client = f"[{SITE_NAME}] Reserva confirmada"
     html_client = (
         f"<p>Hola {booking.customer_name},</p>"
@@ -109,37 +111,26 @@ def send_booking_emails(booking: Booking):
         f"<p>Notas: {booking.notes or '-'}</p>"
         f"<p>Puedes visitar nuestro sitio en <a href=\"{SITE_URL}\">{SITE_URL}</a></p>"
     )
+    # Correo al cliente
     msg_client = EmailMultiAlternatives(
         subject_client,
         strip_tags(html_client),
         settings.DEFAULT_FROM_EMAIL,
         [booking.customer_email],
-        # opcional: bcc a la pyme:
-        # bcc=[PYME_NOTIFY_EMAIL] if PYME_NOTIFY_EMAIL else None,
     )
     msg_client.attach_alternative(html_client, "text/html")
     _attach_ics(msg_client, build_ics(booking))
     msg_client.send(fail_silently=False)
 
-    # Correo a la pyme
+    # Copia al correo de la pyme (Stephanos) con la misma información
     if PYME_NOTIFY_EMAIL:
-        subject_py = f"[{SITE_NAME}] Nueva reserva"
-        html_py = (
-            f"<p>Se ha tomado una nueva reserva.</p>"
-            f"<ul>"
-            f"<li>Servicio: <strong>{booking.slot.service.name}</strong></li>"
-            f"<li>Cliente: {booking.customer_name} ({booking.customer_email})</li>"
-            f"<li>Teléfono: {getattr(booking, 'customer_phone', '') or '-'}</li>"
-            f"<li>Fecha/Hora: {_fmt_local(booking.slot.starts_at)}</li>"
-            f"<li>Abono: ${getattr(booking, 'deposit_amount', 0):,} CLP</li>"
-            f"</ul>"
-        )
-        msg_py = EmailMultiAlternatives(
-            subject_py,
-            strip_tags(html_py),
+        msg_pyme = EmailMultiAlternatives(
+            subject_client,
+            strip_tags(html_client),
             settings.DEFAULT_FROM_EMAIL,
             [PYME_NOTIFY_EMAIL],
         )
-        msg_py.attach_alternative(html_py, "text/html")
-        _attach_ics(msg_py, build_ics(booking), filename="reserva_pyme.ics")
-        msg_py.send(fail_silently=False)
+        msg_pyme.attach_alternative(html_client, "text/html")
+        # Utiliza un nombre de archivo distinto para la copia del .ics
+        _attach_ics(msg_pyme, build_ics(booking), filename="reserva_stephanos.ics")
+        msg_pyme.send(fail_silently=False)
