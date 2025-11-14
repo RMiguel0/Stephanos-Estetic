@@ -11,6 +11,53 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // importa todas las imágenes de la carpeta como URLs procesadas por Vite
+  const serviceImages = import.meta.glob(
+    "../assets/products/*.{webp,png,jpg,jpeg,svg}",
+    { eager: true, import: "default" }
+  );
+
+  // util: genera slug consistente a partir del nombre si no tienes service.slug
+  function toSlug(text = "") {
+    return String(text)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+  }
+
+  // igual que en services.jsx: intenta usar imagen del backend
+  // y si no hay, busca en /assets/products/ por slug/nombre
+  function getServiceImage(service) {
+    if (!service) return null;
+
+    // si el backend ya entrega una URL de imagen, úsala directamente
+    if (service.image) {
+      return service.image;
+    }
+
+    const baseName =
+      (service.slug && String(service.slug).trim()) ||
+      (service.name && toSlug(service.name)) ||
+      "";
+
+    if (!baseName) return null;
+
+    const candidates = [
+      `../assets/products/${baseName}.webp`,
+      `../assets/products/${baseName}.jpg`,
+      `../assets/products/${baseName}.jpeg`,
+      `../assets/products/${baseName}.png`,
+      `../assets/products/${baseName}.svg`,
+    ];
+    for (const p of candidates) {
+      if (serviceImages[p]) return serviceImages[p];
+    }
+    return null; // fallback a emoji
+  }
+
   const categories = [
     { id: "all", label: "All Products", icon: Package },
     { id: "clothing", label: "Clothing", icon: Shirt },
@@ -40,20 +87,22 @@ export default function Products() {
 
   const addToCart = (product) => {
     addItem(product, 1);
-    setAddMsg("Añadido al carrito ✨");
-    setTimeout(() => setAddMsg(""), 1500);
+    // si quieres mostrar mensaje, define setAddMsg en el state
+    // setAddMsg("Añadido al carrito ✨");
+    // setTimeout(() => setAddMsg(""), 1500);
   };
 
   const mapBackendProduct = (p) => ({
-    id: p.sku, // usa el SKU como id visible
+    id: p.sku,
     sku: p.sku,
+    slug: p.slug,
     name: p.name,
     price: Number(p.price) || 0,
     stock: typeof p.stock === "number" ? p.stock : 0,
-    // Si aún no tienes categoría/descr en el backend, usa algo por defecto
-    category: guessCategory(p.name), // helper abajo
-    description: "", // o alguna descripción si la tienes
-    featured: false,
+    image: p.public_image_url || null, // 👈 viene del serializer
+    category: guessCategory(p.name),
+    description: p.description || "",
+    featured: Boolean(p.featured),
   });
 
   function guessCategory(name = "") {
@@ -128,6 +177,7 @@ export default function Products() {
       setLoading(false);
     }
   };
+
   const getCategoryEmoji = (cat) => {
     switch (cat) {
       case "clothing":
@@ -148,7 +198,6 @@ export default function Products() {
     } else {
       // Aquí puedes navegar a un detalle futuro si quieres
       // navigate(`/products/${product.id}`)
-      // Por ahora, nada:
     }
   };
 
@@ -177,7 +226,7 @@ export default function Products() {
           </p>
         </div>
 
-        {/* Filtros (mantenido) */}
+        {/* Filtros */}
         <div className="mb-10">
           <div className="flex flex-wrap justify-center gap-3">
             {categories.map((category) => {
@@ -210,80 +259,97 @@ export default function Products() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:-translate-y-1 group"
-              >
-                <div className="relative h-64 bg-gradient-to-br from-pink-50 to-pink-100 flex items-center justify-center overflow-hidden">
-                  <div className="text-7xl transform group-hover:scale-110 transition-transform duration-300">
-                    {getCategoryEmoji(product.category)}
-                  </div>
-                  {product.featured && (
-                    <div className="absolute top-3 right-3 bg-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                      Featured
-                    </div>
-                  )}
-                </div>
-                <div className="p-5">
-                  <div className="inline-block px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-semibold mb-3 uppercase">
-                    {product.category}
-                  </div>
+            {filteredProducts.map((product) => {
+              const imageUrl = getServiceImage(product);
 
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold text-gray-900 line-clamp-1">
-                      {product.name}
-                    </h3>
-                    <span
-                      className={`ml-3 text-xs font-semibold px-2 py-1 rounded-full ${
-                        product.stock > 0
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-200 text-gray-600"
-                      }`}
-                      title="Stock disponible"
-                    >
-                      {product.stock > 0
-                        ? `Stock: ${product.stock}`
-                        : "Agotado"}
-                    </span>
-                  </div>
-
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
-                    {product.description}
-                  </p>
-
-                  <div className="flex items-center justify-between">
-                    <div className="text-2xl font-bold text-pink-600">
-                      {formatPrice(product.price)}
-                    </div>
-
-                    {product.category === "personalization" ? (
-                      <button
-                        onClick={() => handleView(product)}
-                        className="px-4 py-2 bg-white text-pink-600 rounded-lg font-semibold border-2 border-pink-200 hover:border-pink-300 hover:bg-pink-50 transition-all text-sm"
-                      >
-                        Personalizar
-                      </button>
+              return (
+                <div
+                  key={product.id}
+                  className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:-translate-y-1 group"
+                >
+                  <div className="relative h-64 bg-gradient-to-br from-pink-50 to-pink-100 flex items-center justify-center overflow-hidden">
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
                     ) : (
-                      <button
-                        onClick={() => addItem(product, 1)}
-                        disabled={product.stock <= 0}
-                        className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
-                          product.stock > 0
-                            ? "bg-gradient-to-r from-pink-500 to-pink-600 text-white hover:shadow-lg hover:scale-105"
-                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                        }`}
-                        title={
-                          product.stock > 0 ? "Añadir al carrito" : "Sin stock"
-                        }
-                      >
-                        {product.stock > 0 ? "Añadir al carrito" : "Sin stock"}
-                      </button>
+                      <div className="text-7xl transform group-hover:scale-110 transition-transform duration-300">
+                        {getCategoryEmoji(product.category)}
+                      </div>
+                    )}
+
+                    {product.featured && (
+                      <div className="absolute top-3 right-3 bg-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                        Featured
+                      </div>
                     )}
                   </div>
+                  <div className="p-5">
+                    <div className="inline-block px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-semibold mb-3 uppercase">
+                      {product.category}
+                    </div>
+
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-bold text-gray-900 line-clamp-1">
+                        {product.name}
+                      </h3>
+                      <span
+                        className={`ml-3 text-xs font-semibold px-2 py-1 rounded-full ${
+                          product.stock > 0
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-200 text-gray-600"
+                        }`}
+                        title="Stock disponible"
+                      >
+                        {product.stock > 0
+                          ? `Stock: ${product.stock}`
+                          : "Agotado"}
+                      </span>
+                    </div>
+
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
+                      {product.description}
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <div className="text-2xl font-bold text-pink-600">
+                        {formatPrice(product.price)}
+                      </div>
+
+                      {product.category === "personalization" ? (
+                        <button
+                          onClick={() => handleView(product)}
+                          className="px-4 py-2 bg-white text-pink-600 rounded-lg font-semibold border-2 border-pink-200 hover:border-pink-300 hover:bg-pink-50 transition-all text-sm"
+                        >
+                          Personalizar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => addItem(product, 1)}
+                          disabled={product.stock <= 0}
+                          className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                            product.stock > 0
+                              ? "bg-gradient-to-r from-pink-500 to-pink-600 text-white hover:shadow-lg hover:scale-105"
+                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }`}
+                          title={
+                            product.stock > 0
+                              ? "Añadir al carrito"
+                              : "Sin stock"
+                          }
+                        >
+                          {product.stock > 0
+                            ? "Añadir al carrito"
+                            : "Sin stock"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

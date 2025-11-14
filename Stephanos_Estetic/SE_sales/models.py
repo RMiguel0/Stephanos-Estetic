@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
 from django.db import transaction
-
+from django.utils.text import slugify
 
 class Product(models.Model):
     sku   = models.CharField(max_length=32, unique=True, db_index=True, blank=True)
@@ -12,16 +12,24 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     activo = models.BooleanField(default=True, db_index=True)
 
+    image = models.ImageField(upload_to="products/", blank=True, null=True)
+    image_url = models.URLField(blank=True)
+
+    slug  = models.SlugField(max_length=140, unique=True, blank=True)  # 👈 así
+
     def __str__(self):
-        # Lo que verás en admin/listas
         return f"{self.sku or '-'} — {self.name}"
+
 
     class Meta:
         ordering = ["name"]
         constraints = [
-            models.CheckConstraint(check=models.Q(price__gte=0), name="product_price_gte_0"),
+            models.CheckConstraint(
+                check=models.Q(price__gte=0),
+                name="product_price_gte_0",
+            ),
         ]
-    
+
     def consume_stock(self, qty: int):
         """Descuenta stock de forma segura dentro de una transacción."""
         if qty <= 0:
@@ -30,6 +38,7 @@ class Product(models.Model):
             raise ValueError(f"Stock insuficiente para {self.name}")
         self.stock = models.F("stock") - qty
         self.save(update_fields=["stock"])
+
 
 
 class Order(models.Model):

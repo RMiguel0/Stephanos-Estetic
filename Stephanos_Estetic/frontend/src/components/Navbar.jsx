@@ -1,7 +1,7 @@
 import { NavLink, Link } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
-import logo from "../assets/logo.svg";
+import logo from "../assets/logo_SE.svg";
 
 const API_BASE = "http://localhost:8000"; // backend Django
 
@@ -42,7 +42,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-100">
       <nav className="site-container h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <img src={logo} alt="Stephanos Estetic" className="h-8 w-auto" />
+          <img src={logo} alt="Stephanos Estetic" className="h-20 w-auto" />
           <span className="font-semibold tracking-tight">
             Stephanos Estetic
           </span>

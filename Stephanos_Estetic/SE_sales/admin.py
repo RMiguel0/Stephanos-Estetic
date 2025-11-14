@@ -1,11 +1,11 @@
-# SE_sales/admin.py
 from django.contrib import admin
 from import_export import resources, fields
 from import_export.admin import ImportExportModelAdmin
+from django.utils.html import format_html  # 👈 para la miniatura
 from .models import Product, Order, OrderItem
 
 
-# ---------- Product (como lo tienes) ----------
+# ---------- Product (import/export) ----------
 class ProductResource(resources.ModelResource):
     sku   = fields.Field(attribute="sku", column_name="SKU")
     stock = fields.Field(attribute="stock", column_name="Stock")
@@ -17,12 +17,54 @@ class ProductResource(resources.ModelResource):
         skip_unchanged = True
         report_skipped = True
 
+
 @admin.register(Product)
 class ProductAdmin(ImportExportModelAdmin):
     resource_class = ProductResource
-    list_display = ("sku", "name", "stock", "price")
-    readonly_fields = ("sku",)  # ejemplo
-    search_fields = ("sku", "name")
+
+    # mostramos imagen, activo y slug
+    list_display = ("sku", "name", "stock", "price", "activo", "slug", "image_thumb")
+    search_fields = ("sku", "name", "slug")
+    list_filter = ("activo",)
+
+    # sku no editable, image_thumb solo lectura
+    readonly_fields = ("sku", "image_thumb")
+
+    # que el slug se propague desde name en el admin
+    prepopulated_fields = {"slug": ("name",)}
+
+    fieldsets = (
+        ("Datos básicos", {
+            "fields": ("sku", "name", "slug", "price", "stock", "activo"),
+        }),
+        ("Imagen", {
+            "fields": ("image", "image_url", "image_thumb"),
+        }),
+    )
+
+    def image_thumb(self, obj):
+        """
+        Miniatura de la imagen del producto (usa image_url si existe, 
+        si no, image.file).
+        """
+        url = ""
+        if getattr(obj, "image_url", ""):
+            url = obj.image_url
+        elif getattr(obj, "image", None):
+            try:
+                url = obj.image.url
+            except Exception:
+                url = ""
+
+        if not url:
+            return "(sin imagen)"
+
+        return format_html(
+            '<img src="{}" style="max-height:80px; max-width:80px; border-radius:4px;" />',
+            url,
+        )
+
+    image_thumb.short_description = "Vista previa"
 
 
 # ---------- Order / OrderItem como histórico ----------
@@ -45,15 +87,14 @@ class OrderItemInline(admin.TabularInline):
 class OrderAdmin(admin.ModelAdmin):
     inlines = [OrderItemInline]
 
-    list_display = ("id", "customer_name", "customer_email", "total_amount", "status", "paid_at")
+    list_display = ("id", "customer_name", "customer_email",
+                    "total_amount", "status", "paid_at")
     list_filter  = ("status", "paid_at")
     search_fields = ("customer_name", "customer_email", "id")
 
     # vuelve TODOS los campos de Order solo lectura
     def get_readonly_fields(self, request, obj=None):
-        # incluye ForeignKeys y DateTime, etc.
         fields = [f.name for f in self.model._meta.fields]
-        # si tu modelo tiene ManyToMany, añádelos también:
         fields += [m.name for m in self.model._meta.many_to_many]
         return fields
 
@@ -66,8 +107,6 @@ class OrderAdmin(admin.ModelAdmin):
 
     # mantener la vista de detalle como read-only
     def has_change_permission(self, request, obj=None):
-        # True para que se pueda “ver” el detalle en el admin,
-        # pero como todos los campos son readonly, no podrán modificarlos.
         return True
 
     # opcional: quitar acciones masivas

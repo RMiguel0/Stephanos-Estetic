@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Send, Mail, Phone, MapPin, Check } from "lucide-react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -11,6 +12,7 @@ export default function Contact() {
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   async function postJSON(url, body) {
     const res = await fetch(url, {
@@ -70,7 +72,8 @@ export default function Contact() {
             </span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            ¿Tienes preguntas, comentarios o necesitas ayuda? Estamos aquí para ayudar. ¡Contáctanos en cualquier momento!
+            ¿Tienes preguntas, comentarios o necesitas ayuda? Estamos aquí para
+            ayudar. ¡Contáctanos en cualquier momento!
           </p>
         </div>
 
@@ -81,8 +84,13 @@ export default function Contact() {
               <Mail className="h-7 w-7 text-pink-600" />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Email</h3>
-            <p className="text-gray-600 mb-3">Escríbenos en cualquier momento</p>
-            <a href="mailto:stephanosestetic@gmail.com" className="text-pink-600 hover:text-pink-700 font-semibold">
+            <p className="text-gray-600 mb-3">
+              Escríbenos en cualquier momento
+            </p>
+            <a
+              href="mailto:stephanosestetic@gmail.com"
+              className="text-pink-600 hover:text-pink-700 font-semibold"
+            >
               stephanosestetic@gmail.com
             </a>
           </div>
@@ -93,7 +101,10 @@ export default function Contact() {
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Llámanos</h3>
             <p className="text-gray-600 mb-3">Lun-Vie, 9AM-6PM</p>
-            <a href="tel:+56 9 7344 5731" className="text-pink-600 hover:text-pink-700 font-semibold">
+            <a
+              href="tel:+56 9 7344 5731"
+              className="text-pink-600 hover:text-pink-700 font-semibold"
+            >
               +56 9 7344 5731
             </a>
           </div>
@@ -102,17 +113,23 @@ export default function Contact() {
         {/* Formulario */}
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg p-8 lg:p-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">Dejanos un Mensaje</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">
+              Dejanos un Mensaje
+            </h2>
             <p className="text-gray-600 mb-8 text-center">
-              Completa el formulario a continuación y nos pondremos en contacto contigo lo antes posible
+              Completa el formulario a continuación y nos pondremos en contacto
+              contigo lo antes posible
             </p>
 
             {showSuccess ? (
               <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
                 <Check className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-green-900 mb-2">¡Mensaje Enviado Exitosamente!</h3>
+                <h3 className="text-2xl font-bold text-green-900 mb-2">
+                  ¡Mensaje Enviado Exitosamente!
+                </h3>
                 <p className="text-green-700 mb-6">
-                  Gracias por ponerte en contacto. Responderemos a tu consulta en un plazo de 24 horas.
+                  Gracias por ponerte en contacto. Responderemos a tu consulta
+                  en un plazo de 24 horas.
                 </p>
                 <button
                   onClick={() => setShowSuccess(false)}
@@ -131,24 +148,32 @@ export default function Contact() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tu Nombre *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tu Nombre *
+                    </label>
                     <input
                       type="text"
                       required
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
                       placeholder="John Doe"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tu Correo Electrónico *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tu Correo Electrónico *
+                    </label>
                     <input
                       type="email"
                       required
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
                       placeholder="john@ejemplo.com"
                     />
@@ -156,24 +181,32 @@ export default function Contact() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Asunto *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Asunto *
+                  </label>
                   <input
                     type="text"
                     required
                     value={formData.subject}
-                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, subject: e.target.value })
+                    }
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
                     placeholder="¿Cómo podemos ayudarte?"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Mensaje *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mensaje *
+                  </label>
                   <textarea
                     required
                     rows={6}
                     value={formData.message}
-                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, message: e.target.value })
+                    }
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all resize-none"
                     placeholder="Cuéntanos más sobre tu consulta..."
                   />
@@ -204,18 +237,28 @@ export default function Contact() {
         {/* CTA inferior */}
         <div className="mt-12 text-center">
           <div className="bg-gradient-to-r from-pink-500 to-pink-600 rounded-2xl p-8 lg:p-12 text-white shadow-xl">
-            <h2 className="text-3xl font-bold mb-4">Únete a Nuestra Comunidad</h2>
+            <h2 className="text-3xl font-bold mb-4">
+              Únete a Nuestra Comunidad
+            </h2>
             <p className="text-pink-100 text-lg mb-6 max-w-2xl mx-auto">
-              Mantente actualizado con nuestros últimos servicios, productos y consejos de bienestar. Síguenos en las redes sociales.
+              Mantente actualizado con nuestros últimos servicios, productos y
+              consejos de bienestar. Síguenos en las redes sociales.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <button className="px-6 py-3 bg-white text-pink-600 rounded-lg font-semibold hover:bg-pink-50 transition-all">
+              <button
+                onClick={() =>
+                  window.open(
+                    "https://www.instagram.com/stephanosestetic",
+                    "_blank"
+                  )
+                }
+                className="px-6 py-3 bg-white text-pink-600 rounded-lg font-semibold hover:bg-pink-50 transition-all"
+              >
                 Síguenos en Instagram
               </button>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -125,29 +125,59 @@ export default function Services() {
     return res.json();
   };
 
-  // Obtiene el usuario autenticado (si existe)
   const fetchMe = async () => {
     setUserLoading(true);
     setUserError(null);
     try {
-      // OJO: en tu proyecto las rutas de usuarios cuelgan de /api/users/...
-      const res = await fetch("/api/users/me/", { credentials: "include" });
-      if (!res.ok) {
-        // 401/403 se manejan como "no logueado"
+      // OJO: aquí sin la 's'
+      const meRes = await fetch("/api/user/me/", { credentials: "include" });
+      if (!meRes.ok) {
         setCurrentUser(null);
         return;
       }
-      const data = await res.json();
-      if (data?.is_authenticated) {
-        setCurrentUser({
-          id: data.id,
-          name: data.full_name || data.username,
-          email: data.email,
-          phone: data.phone || "",
-        });
-      } else {
+
+      const me = await meRes.json();
+      if (!me?.is_authenticated) {
         setCurrentUser(null);
+        return;
       }
+
+      // Intentar leer /api/profile/ para nombre y teléfono
+      let profile = null;
+      try {
+        const profRes = await fetch("/api/profile/", {
+          credentials: "include",
+        });
+        if (profRes.ok) {
+          profile = await profRes.json();
+        }
+      } catch (e) {
+        console.warn("No se pudo cargar /api/profile/:", e);
+      }
+
+      const fullName =
+        profile?.full_name ??
+        (`${me.first_name || ""} ${me.last_name || ""}`.trim() || me.username);
+
+      const email = profile?.email ?? me.email ?? "";
+      const phone = profile?.phone ?? "";
+
+      const userObj = {
+        id: me.id,
+        name: fullName,
+        email,
+        phone,
+      };
+
+      setCurrentUser(userObj);
+
+      // Prefill del formulario de reserva (pero editable)
+      setBookingForm((prev) => ({
+        ...prev,
+        customer_name: prev.customer_name || userObj.name || "",
+        customer_email: prev.customer_email || userObj.email || "",
+        customer_phone: prev.customer_phone || userObj.phone || "",
+      }));
     } catch (e) {
       console.error("fetchMe error:", e);
       setUserError("No fue posible cargar tu sesión.");
@@ -169,7 +199,8 @@ export default function Services() {
           id: "svc1",
           type: "beauty",
           name: "Limpieza facial profunda",
-          description: "Renueva y oxigena tu piel con una limpieza profesional.",
+          description:
+            "Renueva y oxigena tu piel con una limpieza profesional.",
           duration_minutes: 60,
           price: 24990,
           active: true,
@@ -268,22 +299,14 @@ export default function Services() {
     if (!selectedSchedule) return;
     setError("");
 
-    // Arma el payload según el usuario autenticado
-    let booking;
-    if (currentUser) {
-      booking = {
-        service_schedule_id: selectedSchedule.id,
-        notes: bookingForm.notes,
-      };
-    } else {
-      booking = {
-        service_schedule_id: selectedSchedule.id,
-        customer_name: bookingForm.customer_name,
-        customer_email: bookingForm.customer_email,
-        customer_phone: bookingForm.customer_phone,
-        notes: bookingForm.notes,
-      };
-    }
+    // Siempre mandamos datos de contacto, haya sesión o no
+    const booking = {
+      service_schedule_id: selectedSchedule.id,
+      customer_name: bookingForm.customer_name || currentUser?.name || "",
+      customer_email: bookingForm.customer_email || currentUser?.email || "",
+      customer_phone: bookingForm.customer_phone || currentUser?.phone || "",
+      notes: bookingForm.notes,
+    };
 
     try {
       await fetch("/api/csrf/", { credentials: "include" });
@@ -385,7 +408,8 @@ export default function Services() {
             </span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Reserva tu sesión de belleza personalizada con nuestro equipo de expertos
+            Reserva tu sesión de belleza personalizada con nuestro equipo de
+            expertos
           </p>
         </div>
 
@@ -585,7 +609,9 @@ export default function Services() {
                 </div>
 
                 <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm text-gray-600 mb-1">Hora Seleccionada:</p>
+                  <p className="text-sm text-gray-600 mb-1">
+                    Hora Seleccionada:
+                  </p>
                   <p className="text-lg font-semibold text-gray-900">
                     {formatDate(selectedSchedule.date)} a las{" "}
                     {formatTime(selectedSchedule.start_time)}
@@ -610,7 +636,8 @@ export default function Services() {
                       ¡Reserva Confirmada!
                     </h4>
                     <p className="text-green-700">
-                      Te enviaremos un correo electrónico de confirmación en breve.
+                      Te enviaremos un correo electrónico de confirmación en
+                      breve.
                     </p>
                   </div>
                 ) : (
@@ -637,7 +664,8 @@ export default function Services() {
                         required
                       />
                       <span className="text-sm text-gray-700">
-                        Acepto el cobro del <b>20%</b> del valor del servicio como abono para confirmar mi reserva.
+                        Acepto el cobro del <b>20%</b> del valor del servicio
+                        como abono para confirmar mi reserva.
                       </span>
                     </label>
 
@@ -645,30 +673,62 @@ export default function Services() {
                       <>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Nombre
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Nombre Completo *
                             </label>
-                            <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
-                              {currentUser.name || "-"}
-                            </div>
+                            <input
+                              type="text"
+                              required
+                              value={bookingForm.customer_name}
+                              onChange={(e) =>
+                                setBookingForm((prev) => ({
+                                  ...prev,
+                                  customer_name: e.target.value,
+                                }))
+                              }
+                              placeholder={currentUser.name || "Tu nombre"}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                            />
                           </div>
+
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Correo
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Correo Electrónico *
                             </label>
-                            <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 break-all">
-                              {currentUser.email || "-"}
-                            </div>
+                            <input
+                              type="email"
+                              required
+                              value={bookingForm.customer_email}
+                              onChange={(e) =>
+                                setBookingForm((prev) => ({
+                                  ...prev,
+                                  customer_email: e.target.value,
+                                }))
+                              }
+                              placeholder={currentUser.email || "tu@correo.cl"}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                            />
                           </div>
+
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Teléfono
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Teléfono *
                             </label>
-                            <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
-                              {currentUser.phone || "-"}
-                            </div>
+                            <input
+                              type="tel"
+                              value={bookingForm.customer_phone}
+                              onChange={(e) =>
+                                setBookingForm((prev) => ({
+                                  ...prev,
+                                  customer_phone: e.target.value,
+                                }))
+                              }
+                              placeholder={currentUser.phone || "+56912345678"}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                            />
                           </div>
                         </div>
+
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Solicitudes Especiales o Notas
@@ -677,7 +737,10 @@ export default function Services() {
                             rows={4}
                             value={bookingForm.notes}
                             onChange={(e) =>
-                              setBookingForm({ ...bookingForm, notes: e.target.value })
+                              setBookingForm((prev) => ({
+                                ...prev,
+                                notes: e.target.value,
+                              }))
                             }
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all resize-none"
                           />
@@ -814,7 +877,12 @@ function guessServiceCategory(name = "") {
     n.includes("acrilica")
   )
     return "manicure";
-  if (n.includes("ceja") || n.includes("pestaña") || n.includes("henna") || n.includes("barba"))
+  if (
+    n.includes("ceja") ||
+    n.includes("pestaña") ||
+    n.includes("henna") ||
+    n.includes("barba")
+  )
     return "cejas";
   if (n.includes("micro") || n.includes("camuflaje") || n.includes("reconstru"))
     return "micropigmentacion";
